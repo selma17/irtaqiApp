@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "485350951916",
+    "project_id": "irtaqi-flutter",
+    "storage_bucket": "irtaqi-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:485350951916:android:1a1c302d9f003ba718cec9",
+        "android_client_info": {
+          "package_name": "com.example.irtaqi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAP1k225Vnjm2l3JeS-oWAGSru4n4Iw_n0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:485350951916:android:a4dc548a899ad96818cec9",
+        "android_client_info": {
+          "package_name": "com.example.irtaqi_new"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAP1k225Vnjm2l3JeS-oWAGSru4n4Iw_n0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

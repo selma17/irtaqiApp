@@ -1,0 +1,605 @@
+[
+  {
+    "hizbNumber": 1,
+    "startSura": "الفاتحة",
+    "startSuraNumber": 1,
+    "startVerse": 1,
+    "endSura": "البقرة",
+    "endSuraNumber": 2,
+    "endVerse": 74,
+    "juzNumber": 1
+  },
+  {
+    "hizbNumber": 2,
+    "startSura": "البقرة",
+    "startSuraNumber": 2,
+    "startVerse":75,
+    "endSura": "البقرة",
+    "endSuraNumber": 2,
+    "endVerse": 141,
+    "juzNumber": 1
+  },
+  {
+    "hizbNumber": 3,
+    "startSura": "البقرة",
+    "startSuraNumber": 2,
+    "startVerse": 142,
+    "endSura": "البقرة",
+    "endSuraNumber": 2,
+    "endVerse": 202,
+    "juzNumber": 2
+  },
+  {
+    "hizbNumber": 4,
+    "startSura": "البقرة",
+    "startSuraNumber": 2,
+    "startVerse": 203,
+    "endSura": "البقرة",
+    "endSuraNumber": 2,
+    "endVerse": 252,
+    "juzNumber": 2
+  },
+  {
+    "hizbNumber": 5,
+    "startSura": "البقرة",
+    "startSuraNumber": 2,
+    "startVerse": 253,
+    "endSura": "آل عمران",
+    "endSuraNumber":3,
+    "endVerse": 14,
+    "juzNumber": 3
+  },
+  {
+    "hizbNumber": 6,
+    "startSura": "آل عمران",
+    "startSuraNumber": 3,
+    "startVerse": 15,
+    "endSura": "آل عمران",
+    "endSuraNumber": 3,
+    "endVerse": 91,
+    "juzNumber": 3
+  },
+  {
+    "hizbNumber": 7,
+    "startSura": "آل عمران",
+    "startSuraNumber": 3,
+    "startVerse": 92,
+    "endSura": "آل عمران",
+    "endSuraNumber": 3,
+    "endVerse": 170,
+    "juzNumber": 4
+  },
+  {
+    "hizbNumber": 8,
+    "startSura": "آل عمران",
+    "startSuraNumber": 3,
+    "startVerse": 171,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 23,
+    "juzNumber": 4
+  },
+  {
+    "hizbNumber": 9,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 24,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 86,
+    "juzNumber": 5
+  },
+  {
+    "hizbNumber": 10,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 87,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 147,
+    "juzNumber": 5
+  },
+  {
+    "hizbNumber": 11,
+    "startSura": "النساء",
+    "startSuraNumber":4,
+    "startVerse": 148,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 26,
+    "juzNumber": 6
+  },
+  {
+    "hizbNumber": 12,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 27,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 81,
+    "juzNumber": 6
+  },
+  {
+    "hizbNumber": 13,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 82,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 35,
+    "juzNumber": 7
+  },
+  {
+    "hizbNumber": 14,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 36,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 110,
+    "juzNumber": 7
+  },
+  {
+    "hizbNumber": 15,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 111,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 165,
+    "juzNumber": 8
+  },
+  {
+    "hizbNumber": 16,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 1,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 87,
+    "juzNumber": 8
+  },
+  {
+    "hizbNumber": 17,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 88,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 170,
+    "juzNumber": 9
+  },
+  {
+    "hizbNumber": 18,
+    "startSura":"الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 171,
+    "endSura": "الأنفال",
+    "endSuraNumber": 8,
+    "endVerse": 40,
+    "juzNumber": 9
+  },
+  {
+    "hizbNumber": 19,
+    "startSura": "الأنفال",
+    "startSuraNumber": 8,
+    "startVerse": 41,
+    "endSura": "التوبة",
+    "endSuraNumber": 9,
+    "endVerse": 33,
+    "juzNumber": 10
+  },
+  {
+    "hizbNumber": 20,
+    "startSura": "التوبة",
+    "startSuraNumber": 9,
+    "startVerse": 34,
+    "endSura": "التوبة",
+    "endSuraNumber": 9,
+    "endVerse": 92,
+    "juzNumber": 10
+  },
+  {
+    "hizbNumber": 21,
+    "startSura": "التوبة",
+    "startSuraNumber": 9,
+    "startVerse": 93,
+    "endSura": "يونس",
+    "endSuraNumber": 10,
+    "endVerse": 25,
+    "juzNumber": 11
+  },
+  {
+    "hizbNumber": 22,
+    "startSura": "يونس",
+    "startSuraNumber": 10,
+    "startVerse": 26,
+    "endSura": "يونس",
+    "endSuraNumber": 10,
+    "endVerse": 109,
+    "juzNumber": 11
+  },
+  {
+    "hizbNumber": 23,
+    "startSura": "هود",
+    "startSuraNumber": 11,
+    "startVerse": 1,
+    "endSura": "هود",
+    "endSuraNumber": 11,
+    "endVerse": 83,
+    "juzNumber": 12
+  },
+  {
+    "hizbNumber": 24,
+    "startSura": "هود",
+    "startSuraNumber": 11,
+    "startVerse": 84,
+    "endSura": "يوسف",
+    "endSuraNumber": 12,
+    "endVerse": 53,
+    "juzNumber": 12
+  },
+  {
+    "hizbNumber": 25,
+    "startSura": "يوسف",
+    "startSuraNumber": 12,
+    "startVerse": 53,
+    "endSura": "الرعد",
+    "endSuraNumber": 13,
+    "endVerse": 18,
+    "juzNumber": 13
+  },
+  {
+    "hizbNumber": 26,
+    "startSura": "الرعد",
+    "startSuraNumber": 13,
+    "startVerse": 19,
+    "endSura": "الرعد",
+    "endSuraNumber": 13,
+    "endVerse": 52,
+    "juzNumber": 13
+  },
+  {
+    "hizbNumber": 27,
+    "startSura": "الحجر",
+    "startSuraNumber": 15,
+    "startVerse": 1,
+    "endSura": "النّحل",
+    "endSuraNumber": 16,
+    "endVerse": 50,
+    "juzNumber": 14
+  },
+  {
+    "hizbNumber": 28,
+    "startSura": "النّحل",
+    "startSuraNumber": 16,
+    "startVerse": 51,
+    "endSura": "النّحل",
+    "endSuraNumber": 16,
+    "endVerse": 128,
+    "juzNumber": 14
+  },
+  {
+    "hizbNumber": 29,
+    "startSura": "الإسراء",
+    "startSuraNumber": 17,
+    "startVerse": 1,
+    "endSura": "الإسراء",
+    "endSuraNumber": 17,
+    "endVerse": 98,
+    "juzNumber": 15
+  },
+
+
+  
+  {
+    "hizbNumber": 30,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 36,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 57,
+    "juzNumber": 15
+  },
+  {
+    "hizbNumber": 31,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 58,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 73,
+    "juzNumber": 16
+  },
+  {
+    "hizbNumber": 32,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 74,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 87,
+    "juzNumber": 16
+  },
+  {
+    "hizbNumber": 33,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 88,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 104,
+    "juzNumber": 17
+  },
+  {
+    "hizbNumber": 34,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 105,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 126,
+    "juzNumber": 17
+  },
+  {
+    "hizbNumber": 35,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 127,
+    "endSura": "النساء",
+    "endSuraNumber": 4,
+    "endVerse": 147,
+    "juzNumber": 18
+  },
+  {
+    "hizbNumber": 36,
+    "startSura": "النساء",
+    "startSuraNumber": 4,
+    "startVerse": 148,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 3,
+    "juzNumber": 18
+  },
+  {
+    "hizbNumber": 37,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 4,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 26,
+    "juzNumber": 19
+  },
+  {
+    "hizbNumber": 38,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 27,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 50,
+    "juzNumber": 19
+  },
+  {
+    "hizbNumber": 39,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 51,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 71,
+    "juzNumber": 20
+  },
+  {
+    "hizbNumber": 40,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 72,
+    "endSura": "المائدة",
+    "endSuraNumber": 5,
+    "endVerse": 96,
+    "juzNumber": 20
+  },
+  {
+    "hizbNumber": 41,
+    "startSura": "المائدة",
+    "startSuraNumber": 5,
+    "startVerse": 97,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 13,
+    "juzNumber": 21
+  },
+  {
+    "hizbNumber": 42,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 14,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 35,
+    "juzNumber": 21
+  },
+  {
+    "hizbNumber": 43,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 36,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 58,
+    "juzNumber": 22
+  },
+  {
+    "hizbNumber": 44,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 59,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 73,
+    "juzNumber": 22
+  },
+  {
+    "hizbNumber": 45,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 74,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 94,
+    "juzNumber": 23
+  },
+  {
+    "hizbNumber": 46,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 95,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 110,
+    "juzNumber": 23
+  },
+  {
+    "hizbNumber": 47,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 111,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 126,
+    "juzNumber": 24
+  },
+  {
+    "hizbNumber": 48,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 127,
+    "endSura": "الأنعام",
+    "endSuraNumber": 6,
+    "endVerse": 147,
+    "juzNumber": 24
+  },
+  {
+    "hizbNumber": 49,
+    "startSura": "الأنعام",
+    "startSuraNumber": 6,
+    "startVerse": 148,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 9,
+    "juzNumber": 25
+  },
+  {
+    "hizbNumber": 50,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 10,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 31,
+    "juzNumber": 25
+  },
+  {
+    "hizbNumber": 51,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 32,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 53,
+    "juzNumber": 26
+  },
+  {
+    "hizbNumber": 52,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 54,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 87,
+    "juzNumber": 26
+  },
+  {
+    "hizbNumber": 53,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 88,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 123,
+    "juzNumber": 27
+  },
+  {
+    "hizbNumber": 54,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 124,
+    "endSura": "الأعراف",
+    "endSuraNumber": 7,
+    "endVerse": 156,
+    "juzNumber": 27
+  },
+  {
+    "hizbNumber": 55,
+    "startSura": "الأعراف",
+    "startSuraNumber": 7,
+    "startVerse": 157,
+    "endSura": "الأنفال",
+    "endSuraNumber": 8,
+    "endVerse": 19,
+    "juzNumber": 28
+  },
+  {
+    "hizbNumber": 56,
+    "startSura": "الأنفال",
+    "startSuraNumber": 8,
+    "startVerse": 20,
+    "endSura": "الأنفال",
+    "endSuraNumber": 8,
+    "endVerse": 40,
+    "juzNumber": 28
+  },
+  {
+    "hizbNumber": 57,
+    "startSura": "الأنفال",
+    "startSuraNumber": 8,
+    "startVerse": 41,
+    "endSura": "التوبة",
+    "endSuraNumber": 9,
+    "endVerse": 18,
+    "juzNumber": 29
+  },
+  {
+    "hizbNumber": 58,
+    "startSura": "التوبة",
+    "startSuraNumber": 9,
+    "startVerse": 19,
+    "endSura": "التوبة",
+    "endSuraNumber": 9,
+    "endVerse": 33,
+    "juzNumber": 29
+  },
+  {
+    "hizbNumber": 59,
+    "startSura": "التوبة",
+    "startSuraNumber": 9,
+    "startVerse": 34,
+    "endSura": "التوبة",
+    "endSuraNumber": 9,
+    "endVerse": 60,
+    "juzNumber": 30
+  },
+  {
+    "hizbNumber": 60,
+    "startSura": "التوبة",
+    "startSuraNumber": 9,
+    "startVerse": 61,
+    "endSura": "الناس",
+    "endSuraNumber": 114,
+    "endVerse": 6,
+    "juzNumber": 30
+  }
+]
