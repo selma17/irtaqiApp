@@ -1,62 +1,93 @@
-// lib/screens/common/send_remark_page.dart
+// lib/screens/admin/send_remark_page.dart
 
 import 'package:flutter/material.dart';
 import '../../services/remark_service.dart';
+import '../../services/auth_service.dart';
 
 class SendRemarkPage extends StatefulWidget {
+  const SendRemarkPage({Key? key}) : super(key: key);
+
   @override
-  _SendRemarkPageState createState() => _SendRemarkPageState();
+  State<SendRemarkPage> createState() => _SendRemarkPageState();
 }
 
 class _SendRemarkPageState extends State<SendRemarkPage> {
   final RemarkService _remarkService = RemarkService();
+  final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
   
   final _subjectController = TextEditingController();
-  final _detailsController = TextEditingController();
-  
-  String _type = 'suggestion';
+  final _messageController = TextEditingController();
+  String _selectedType = 'suggestion';
   bool _isAnonymous = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
     _subjectController.dispose();
-    _detailsController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendRemark() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submitRemark() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
 
-    setState(() => _isLoading = true);
-
-    bool success = await _remarkService.sendRemark(
-      subject: _subjectController.text.trim(),
-      type: _type,
-      details: _detailsController.text.trim(),
-      isAnonymous: _isAnonymous,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ تم إرسال الملاحظة بنجاح'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Construire le message complet avec les détails
+      String fullMessage = 'الموضوع: ${_subjectController.text}\n\n';
+      fullMessage += 'النوع: ${_getTypeLabel(_selectedType)}\n\n';
+      fullMessage += 'الرسالة:\n${_messageController.text}';
       
-      // Clear and go back
-      Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ حدث خطأ أثناء الإرسال'),
-          backgroundColor: Colors.red,
-        ),
+      if (_isAnonymous) {
+        fullMessage += '\n\n(ملاحظة: هذه رسالة مجهولة)';
+      }
+
+      bool success = await _remarkService.sendRemark(
+        senderId: _authService.getCurrentUserId() ?? 'unknown',
+        senderName: _isAnonymous ? 'مجهول' : 'الإدارة',
+        senderRole: 'admin',
+        message: fullMessage,
       );
+
+      if (!mounted) return;
+      
+      setState(() => _isLoading = false);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ تم إرسال الملاحظة بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _formKey.currentState!.reset();
+        _subjectController.clear();
+        _messageController.clear();
+        setState(() {
+          _selectedType = 'suggestion';
+          _isAnonymous = false;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ حدث خطأ أثناء الإرسال'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getTypeLabel(String type) {
+    switch (type) {
+      case 'suggestion':
+        return 'اقتراح';
+      case 'complaint':
+        return 'شكوى';
+      case 'question':
+        return 'استفسار';
+      default:
+        return 'أخرى';
     }
   }
 
@@ -77,220 +108,9 @@ class _SendRemarkPageState extends State<SendRemarkPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.feedback, color: Colors.white, size: 32),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ملاحظة جديدة',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'شاركنا رأيك أو اقتراحك',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 24),
-
-                // Form
-                Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Subject
-                      Text(
-                        'الموضوع *',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF4F6F52),
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      TextFormField(
-                        controller: _subjectController,
-                        decoration: InputDecoration(
-                          hintText: 'عنوان الملاحظة',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: Icon(Icons.title, color: Color(0xFF4F6F52)),
-                        ),
-                        validator: (value) =>
-                            value!.isEmpty ? 'الرجاء إدخال الموضوع' : null,
-                      ),
-                      SizedBox(height: 20),
-
-                      // Type
-                      Text(
-                        'النوع *',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF4F6F52),
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildTypeChip('suggestion', 'اقتراح', Icons.lightbulb),
-                          _buildTypeChip('problem', 'مشكلة', Icons.warning),
-                          _buildTypeChip('question', 'سؤال', Icons.help),
-                          _buildTypeChip('other', 'أخرى', Icons.note),
-                        ],
-                      ),
-                      SizedBox(height: 20),
-
-                      // Details
-                      Text(
-                        'التفاصيل *',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF4F6F52),
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      TextFormField(
-                        controller: _detailsController,
-                        maxLines: 6,
-                        decoration: InputDecoration(
-                          hintText: 'اكتب تفاصيل الملاحظة هنا...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignLabelWithHint: true,
-                        ),
-                        validator: (value) =>
-                            value!.isEmpty ? 'الرجاء إدخال التفاصيل' : null,
-                      ),
-                      SizedBox(height: 20),
-
-                      // Anonymous option
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: CheckboxListTile(
-                          title: Text('إرسال بشكل مجهول'),
-                          subtitle: Text(
-                            'لن يتم إظهار اسمك للإدارة',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          value: _isAnonymous,
-                          onChanged: (value) {
-                            setState(() => _isAnonymous = value ?? false);
-                          },
-                          activeColor: Color(0xFF4F6F52),
-                        ),
-                      ),
-
-                      SizedBox(height: 24),
-
-                      // Info box
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'سيتم مراجعة ملاحظتك من قبل الإدارة في أقرب وقت',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue[900],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 24),
-
-                      // Send Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _sendRemark,
-                          icon: _isLoading
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : Icon(Icons.send),
-                          label: Text(
-                            _isLoading ? 'جاري الإرسال...' : 'إرسال الملاحظة',
-                            style: TextStyle(fontSize: 18),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF4F6F52),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildInfoCard(),
+                SizedBox(height: 20),
+                _buildFormCard(),
               ],
             ),
           ),
@@ -299,33 +119,174 @@ class _SendRemarkPageState extends State<SendRemarkPage> {
     );
   }
 
-  Widget _buildTypeChip(String value, String label, IconData icon) {
-    bool isSelected = _type == value;
-    
-    return FilterChip(
-      selected: isSelected,
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : Color(0xFF4F6F52),
+  Widget _buildInfoCard() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFF4F6F52).withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: Offset(0, 5),
           ),
-          SizedBox(width: 4),
-          Text(label),
         ],
       ),
-      onSelected: (selected) {
-        if (selected) {
-          setState(() => _type = value);
-        }
-      },
-      selectedColor: Color(0xFF4F6F52),
-      checkmarkColor: Colors.white,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Color(0xFF4F6F52),
-        fontWeight: FontWeight.w600,
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.message, color: Colors.white, size: 32),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'إرسال ملاحظة عامة',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'يمكنك إرسال ملاحظة أو استفسار للنظام',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormCard() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Subject
+          TextFormField(
+            controller: _subjectController,
+            decoration: InputDecoration(
+              labelText: 'الموضوع *',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              prefixIcon: Icon(Icons.subject),
+            ),
+            validator: (value) =>
+                value!.isEmpty ? 'الرجاء إدخال الموضوع' : null,
+          ),
+          SizedBox(height: 16),
+
+          // Type
+          DropdownButtonFormField<String>(
+            value: _selectedType,
+            decoration: InputDecoration(
+              labelText: 'النوع *',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              prefixIcon: Icon(Icons.category),
+            ),
+            items: [
+              DropdownMenuItem(value: 'suggestion', child: Text('اقتراح')),
+              DropdownMenuItem(value: 'complaint', child: Text('شكوى')),
+              DropdownMenuItem(value: 'question', child: Text('استفسار')),
+              DropdownMenuItem(value: 'other', child: Text('أخرى')),
+            ],
+            onChanged: (value) => setState(() => _selectedType = value!),
+          ),
+          SizedBox(height: 16),
+
+          // Message
+          TextFormField(
+            controller: _messageController,
+            maxLines: 6,
+            maxLength: 500,
+            decoration: InputDecoration(
+              labelText: 'الرسالة *',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              alignLabelWithHint: true,
+            ),
+            validator: (value) =>
+                value!.isEmpty ? 'الرجاء إدخال الرسالة' : null,
+          ),
+          SizedBox(height: 16),
+
+          // Anonymous checkbox
+          CheckboxListTile(
+            value: _isAnonymous,
+            onChanged: (value) => setState(() => _isAnonymous = value!),
+            title: Text('إرسال كمجهول'),
+            subtitle: Text('سيتم إخفاء اسمك من الملاحظة'),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+          SizedBox(height: 20),
+
+          // Submit button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _submitRemark,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF4F6F52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isLoading
+                  ? SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.send, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'إرسال الملاحظة',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

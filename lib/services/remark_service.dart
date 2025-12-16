@@ -1,48 +1,28 @@
 // lib/services/remark_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../models/remark_model.dart';
 
 class RemarkService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Envoyer une remarque
   Future<bool> sendRemark({
-    required String subject,
-    required String type, // "suggestion", "problem", "question", "other"
-    required String details,
-    bool isAnonymous = false,
+    required String senderId,
+    required String senderName,
+    required String senderRole,
+    required String message,
   }) async {
     try {
-      String userId = _auth.currentUser?.uid ?? '';
-      String senderName = 'مستخدم مجهول';
-      String senderRole = 'etudiant';
-
-      if (!isAnonymous && userId.isNotEmpty) {
-        DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
-        if (userDoc.exists) {
-          Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-          senderName = '${userData['firstName']} ${userData['lastName']}';
-          senderRole = userData['role'] ?? 'etudiant';
-        }
-      }
-
       await _firestore.collection('remarks').add({
-        'subject': subject,
-        'type': type,
-        'details': details,
-        'isAnonymous': isAnonymous,
-        'sentBy': isAnonymous ? null : userId,
+        'senderId': senderId,
         'senderName': senderName,
         'senderRole': senderRole,
-        'status': 'new', // "new", "open"
-        'response': null,
-        'respondedBy': null,
-        'respondedAt': null,
+        'message': message,
+        'status': 'new',
         'createdAt': FieldValue.serverTimestamp(),
+        'readBy': [],
       });
-
       return true;
     } catch (e) {
       print('Erreur sendRemark: $e');
@@ -50,36 +30,63 @@ class RemarkService {
     }
   }
 
-  /// Obtenir toutes les remarques (pour admin)
-  Stream<QuerySnapshot> getAllRemarks() {
+  /// Stream de toutes les remarques (pour admin)
+  Stream<List<RemarkModel>> getAllRemarksStream() {
     return _firestore
         .collection('remarks')
         .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => RemarkModel.fromDoc(doc)).toList());
   }
 
-  /// Obtenir les remarques par statut
-  Stream<QuerySnapshot> getRemarksByStatus(String status) {
+  /// Stream des remarques non lues (pour admin)
+  Stream<List<RemarkModel>> getUnreadRemarksStream() {
     return _firestore
         .collection('remarks')
-        .where('status', isEqualTo: status)
+        .where('status', isEqualTo: 'new')
         .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => RemarkModel.fromDoc(doc)).toList());
   }
 
-  /// Répondre à une remarque
+  /// Stream des remarques d'un utilisateur spécifique
+  Stream<List<RemarkModel>> getUserRemarksStream(String userId) {
+    return _firestore
+        .collection('remarks')
+        .where('senderId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => RemarkModel.fromDoc(doc)).toList());
+  }
+
+  /// Marquer une remarque comme lue
+  Future<bool> markAsRead(String remarkId, String adminId) async {
+    try {
+      await _firestore.collection('remarks').doc(remarkId).update({
+        'status': 'open',
+        'readBy': FieldValue.arrayUnion([adminId]),
+      });
+      return true;
+    } catch (e) {
+      print('Erreur markAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Répondre à une remarque (admin)
   Future<bool> respondToRemark({
     required String remarkId,
     required String response,
   }) async {
     try {
       await _firestore.collection('remarks').doc(remarkId).update({
-        'response': response,
-        'respondedBy': _auth.currentUser?.uid,
+        'adminResponse': response,
         'respondedAt': FieldValue.serverTimestamp(),
-        'status': 'open',
+        'status': 'closed',
       });
-
       return true;
     } catch (e) {
       print('Erreur respondToRemark: $e');
@@ -88,14 +95,14 @@ class RemarkService {
   }
 
   /// Changer le statut d'une remarque
-  Future<bool> changeRemarkStatus(String remarkId, String status) async {
+  Future<bool> changeStatus(String remarkId, String newStatus) async {
     try {
       await _firestore.collection('remarks').doc(remarkId).update({
-        'status': status,
+        'status': newStatus,
       });
       return true;
     } catch (e) {
-      print('Erreur changeRemarkStatus: $e');
+      print('Erreur changeStatus: $e');
       return false;
     }
   }
@@ -111,68 +118,17 @@ class RemarkService {
     }
   }
 
-  /// Obtenir le nom de l'admin qui a répondu
-  Future<String> getResponderName(String? userId) async {
-    if (userId == null) return 'الإدارة';
-    
+  /// Compter les remarques non lues
+  Future<int> getUnreadCount() async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
-      if (doc.exists) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        return '${data['firstName']} ${data['lastName']}';
-      }
+      QuerySnapshot snapshot = await _firestore
+          .collection('remarks')
+          .where('status', isEqualTo: 'new')
+          .get();
+      return snapshot.docs.length;
     } catch (e) {
-      print('Error getting responder name: $e');
-    }
-    return 'الإدارة';
-  }
-
-  /// Formater la date
-  String formatDate(Timestamp? timestamp) {
-    if (timestamp == null) return 'الآن';
-    
-    DateTime date = timestamp.toDate();
-    DateTime now = DateTime.now();
-    Duration diff = now.difference(date);
-
-    if (diff.inMinutes < 1) {
-      return 'الآن';
-    } else if (diff.inMinutes < 60) {
-      return 'منذ ${diff.inMinutes} دقيقة';
-    } else if (diff.inHours < 24) {
-      return 'منذ ${diff.inHours} ساعة';
-    } else if (diff.inDays < 7) {
-      return 'منذ ${diff.inDays} يوم';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
-  /// Obtenir l'icône selon le type
-  static String getTypeLabel(String type) {
-    switch (type) {
-      case 'suggestion':
-        return 'اقتراح';
-      case 'problem':
-        return 'مشكلة';
-      case 'question':
-        return 'سؤال';
-      case 'other':
-        return 'أخرى';
-      default:
-        return 'ملاحظة';
-    }
-  }
-
-  /// Obtenir la couleur selon le statut
-  static String getStatusLabel(String status) {
-    switch (status) {
-      case 'new':
-        return 'جديد';
-      case 'open':
-        return 'مفتوح';
-      default:
-        return status;
+      print('Erreur getUnreadCount: $e');
+      return 0;
     }
   }
 }

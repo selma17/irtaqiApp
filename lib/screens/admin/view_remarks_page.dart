@@ -1,18 +1,20 @@
 // lib/screens/admin/view_remarks_page.dart
-// ✅ VERSION FINALE - Tous les bugs corrigés
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/remark_service.dart';
+import '../../models/remark_model.dart';
+import 'package:intl/intl.dart'hide TextDirection;
 
 class ViewRemarksPage extends StatefulWidget {
+  const ViewRemarksPage({Key? key}) : super(key: key);
+
   @override
-  _ViewRemarksPageState createState() => _ViewRemarksPageState();
+  State<ViewRemarksPage> createState() => _ViewRemarksPageState();
 }
 
 class _ViewRemarksPageState extends State<ViewRemarksPage> {
   final RemarkService _remarkService = RemarkService();
-  String _selectedFilter = 'all'; // 'all', 'new', 'open'
+  String _filterStatus = 'all'; // all, new, open, closed
 
   @override
   Widget build(BuildContext context) {
@@ -26,298 +28,428 @@ class _ViewRemarksPageState extends State<ViewRemarksPage> {
         ),
         body: Column(
           children: [
-            // Filter tabs
-            Container(
-              padding: EdgeInsets.all(16),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildFilterChip('all', 'الكل'),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildFilterChip('new', 'جديد'),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildFilterChip('open', 'مفتوح'),
-                  ),
-                ],
-              ),
-            ),
-
-            // Remarks list
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _remarkService.getAllRemarks(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text('حدث خطأ في تحميل الملاحظات'),
-                    );
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox, size: 80, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'لا توجد ملاحظات',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // ✅ Filtrer côté client
-                  List<DocumentSnapshot> allDocs = snapshot.data!.docs;
-                  List<DocumentSnapshot> filteredDocs;
-
-                  if (_selectedFilter == 'all') {
-                    filteredDocs = allDocs;
-                  } else {
-                    filteredDocs = allDocs.where((doc) {
-                      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-                      return data['status'] == _selectedFilter;
-                    }).toList();
-                  }
-
-                  if (filteredDocs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.filter_alt_off, size: 80, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'لا توجد ملاحظات بحالة "${_getFilterLabel(_selectedFilter)}"',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    padding: EdgeInsets.all(16),
-                    itemCount: filteredDocs.length,
-                    itemBuilder: (context, index) {
-                      DocumentSnapshot doc = filteredDocs[index];
-                      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-                      return _buildRemarkCard(doc.id, data);
-                    },
-                  );
-                },
-              ),
-            ),
+            _buildFilterChips(),
+            Expanded(child: _buildRemarksList()),
           ],
         ),
       ),
     );
   }
 
-  String _getFilterLabel(String filter) {
-    switch (filter) {
-      case 'new':
-        return 'جديد';
-      case 'open':
-        return 'مفتوح';
-      default:
-        return 'الكل';
-    }
+  Widget _buildFilterChips() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.white,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildFilterChip('الكل', 'all'),
+            SizedBox(width: 8),
+            _buildFilterChip('جديدة', 'new'),
+            SizedBox(width: 8),
+            _buildFilterChip('قيد المعالجة', 'open'),
+            SizedBox(width: 8),
+            _buildFilterChip('مغلقة', 'closed'),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildFilterChip(String value, String label) {
-    bool isSelected = _selectedFilter == value;
-    
-    return InkWell(
-      onTap: () {
+  Widget _buildFilterChip(String label, String value) {
+    bool isSelected = _filterStatus == value;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
         setState(() {
-          _selectedFilter = value;
+          _filterStatus = value;
         });
       },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF4F6F52) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Color(0xFF4F6F52).withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: Offset(0, 4),
+      selectedColor: Color(0xFF4F6F52).withValues(alpha: 0.2),
+      checkmarkColor: Color(0xFF4F6F52),
+    );
+  }
+
+  Widget _buildRemarksList() {
+    return StreamBuilder<List<RemarkModel>>(
+      stream: _remarkService.getAllRemarksStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('حدث خطأ: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox, size: 80, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'لا توجد ملاحظات',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Filtrer les remarques selon le statut sélectionné
+        List<RemarkModel> filteredRemarks = snapshot.data!.where((remark) {
+          if (_filterStatus == 'all') return true;
+          return remark.status == _filterStatus;
+        }).toList();
+
+        if (filteredRemarks.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.filter_list_off, size: 80, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'لا توجد ملاحظات في هذا التصنيف',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.all(16),
+          itemCount: filteredRemarks.length,
+          itemBuilder: (context, index) {
+            return _buildRemarkCard(filteredRemarks[index]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRemarkCard(RemarkModel remark) {
+    Color statusColor = remark.isNew
+        ? Colors.orange
+        : remark.isOpen
+            ? Colors.blue
+            : Colors.green;
+
+    String statusText = remark.isNew
+        ? 'جديدة'
+        : remark.isOpen
+            ? 'قيد المعالجة'
+            : 'مغلقة';
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _showRemarkDetails(remark),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Status badge
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey[700],
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 14,
+                  SizedBox(width: 8),
+                  // Role badge
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: remark.senderRole == 'prof'
+                          ? Colors.purple.withValues(alpha: 0.2)
+                          : Colors.blue.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      remark.senderRole == 'prof' ? 'أستاذ' : 'طالب',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: remark.senderRole == 'prof'
+                            ? Colors.purple
+                            : Colors.blue,
+                      ),
+                    ),
+                  ),
+                  Spacer(),
+                  Text(
+                    _formatDate(remark.createdAt),
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+              // Sender name
+              Row(
+                children: [
+                  Icon(Icons.person, size: 16, color: Colors.grey),
+                  SizedBox(width: 6),
+                  Text(
+                    remark.senderName,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4F6F52),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              // Message preview
+              Text(
+                remark.message,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, height: 1.5),
+              ),
+              if (remark.hasResponse) ...[
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text(
+                        'تم الرد على هذه الملاحظة',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRemarkCard(String remarkId, Map<String, dynamic> data) {
-    String subject = data['subject'] ?? '';
-    String type = data['type'] ?? '';
-    String status = data['status'] ?? 'new';
-    String senderName = data['senderName'] ?? '';
-    bool isAnonymous = data['isAnonymous'] ?? false;
-    //String? response = data['response'];
-    Timestamp? createdAt = data['createdAt'];
-
-    // Icône et couleur selon le type
-    IconData typeIcon;
-    Color typeColor;
-    String typeLabel;
-
-    switch (type) {
-      case 'suggestion':
-        typeIcon = Icons.lightbulb;
-        typeColor = Colors.amber;
-        typeLabel = 'اقتراح';
-        break;
-      case 'problem':
-        typeIcon = Icons.warning;
-        typeColor = Colors.red;
-        typeLabel = 'مشكلة';
-        break;
-      case 'question':
-        typeIcon = Icons.help;
-        typeColor = Colors.blue;
-        typeLabel = 'سؤال';
-        break;
-      default:
-        typeIcon = Icons.info;
-        typeColor = Colors.grey;
-        typeLabel = 'أخرى';
-    }
-
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      elevation: 2,
+  void _showRemarkDetails(RemarkModel remark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: typeColor.withOpacity(0.2),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: InkWell(
-        onTap: () => _showRemarkDetails(remarkId, data),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.all(16),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Directionality(
+          textDirection: TextDirection.rtl,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(typeIcon, color: typeColor, size: 20),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Color(0xFF4F6F52),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
+                        Icon(Icons.message, color: Colors.white),
+                        SizedBox(width: 8),
                         Text(
-                          subject,
+                          'تفاصيل الملاحظة',
                           style: TextStyle(
-                            fontSize: 16,
+                            color: Colors.white,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.person, size: 14, color: Colors.grey[600]),
-                            SizedBox(width: 4),
-                            Text(
-                              isAnonymous ? 'مجهول' : senderName,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                            SizedBox(width: 4),
-                            Text(
-                              _remarkService.formatDate(createdAt),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                        Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  ],
+                ),
+              ),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Info row
+                      Row(
+                        children: [
+                          Icon(Icons.person, size: 16, color: Colors.grey),
+                          SizedBox(width: 6),
+                          Text(
+                            remark.senderName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: remark.senderRole == 'prof'
+                                  ? Colors.purple.withValues(alpha: 0.2)
+                                  : Colors.blue.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              remark.senderRole == 'prof' ? 'أستاذ' : 'طالب',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: remark.senderRole == 'prof'
+                                    ? Colors.purple
+                                    : Colors.blue,
+                              ),
+                            ),
+                          ),
+                          Spacer(),
+                          Text(
+                            _formatDate(remark.createdAt),
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      // Message
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: typeColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          typeLabel,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: typeColor,
-                          ),
+                          remark.message,
+                          style: TextStyle(fontSize: 14, height: 1.6),
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: status == 'new' ? Colors.red[100] : Colors.blue[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          status == 'new' ? 'جديد' : 'مفتوح',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: status == 'new' ? Colors.red[900] : Colors.blue[900],
+                      SizedBox(height: 20),
+                      // Response section
+                      if (remark.hasResponse) ...[
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.green.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.admin_panel_settings,
+                                      size: 16, color: Colors.green),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'رد الإدارة:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                remark.adminResponse!,
+                                style: TextStyle(fontSize: 14, height: 1.5),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
+                        SizedBox(height: 20),
+                      ],
+                      // Action buttons
+                      if (!remark.isClosed) ...[
+                        if (!remark.isOpen)
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                Navigator.pop(ctx);
+                                await _changeStatus(remark.id, 'open');
+                              },
+                              icon: Icon(Icons.open_in_new),
+                              label: Text('فتح الملاحظة'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                padding: EdgeInsets.all(16),
+                              ),
+                            ),
+                          ),
+                        SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showResponseDialog(remark);
+                            },
+                            icon: Icon(Icons.reply),
+                            label: Text('الرد على الملاحظة'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF4F6F52),
+                              padding: EdgeInsets.all(16),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -326,175 +458,85 @@ class _ViewRemarksPageState extends State<ViewRemarksPage> {
     );
   }
 
-  // ✅ FONCTION SIMPLIFIÉE : Admin peut uniquement changer le statut (pas de réponse)
-  void _showRemarkDetails(String remarkId, Map<String, dynamic> data) {
-    String currentStatus = data['status'] ?? 'new';
+  void _showResponseDialog(RemarkModel remark) {
+    final responseController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          title: Text('تفاصيل الملاحظة'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildDetailRow('الموضوع', data['subject'] ?? ''),
-                SizedBox(height: 12),
-                _buildDetailRow('النوع', _getTypeLabel(data['type'] ?? '')),
-                SizedBox(height: 12),
-                _buildDetailRow('من', data['isAnonymous'] == true ? 'مجهول' : (data['senderName'] ?? '')),
-                SizedBox(height: 12),
-                _buildDetailRow('التفاصيل', data['details'] ?? ''),
-                
-                SizedBox(height: 16),
-                Divider(),
-                SizedBox(height: 12),
-                
-                // ✅ Changement de statut uniquement
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'الحالة:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: currentStatus,
-                          isExpanded: true,
-                          items: [
-                            DropdownMenuItem(
-                              value: 'new',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.fiber_new, size: 18, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('جديد'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 'open',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.folder_open, size: 18, color: Colors.blue),
-                                  SizedBox(width: 8),
-                                  Text('مفتوح'),
-                                ],
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            setStateDialog(() {
-                              currentStatus = value!;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                SizedBox(height: 12),
-                
-                // Info box
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue, size: 18),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'يمكنك تغيير حالة الملاحظة لتنظيمها',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue[900],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('الرد على الملاحظة'),
+          content: TextField(
+            controller: responseController,
+            maxLines: 5,
+            decoration: InputDecoration(
+              hintText: 'اكتب ردك هنا...',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('إغلاق'),
+              child: Text('إلغاء'),
             ),
-            
-            // ✅ Bouton pour changer le statut si modifié
-            if (currentStatus != data['status'])
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF4F6F52),
-                ),
-                onPressed: () async {
-                  await _remarkService.changeRemarkStatus(remarkId, currentStatus);
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✅ تم تحديث الحالة'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                child: Text('تحديث الحالة'),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF4F6F52),
               ),
+              onPressed: () async {
+                if (responseController.text.trim().isNotEmpty) {
+                  Navigator.pop(ctx);
+                  bool success = await _remarkService.respondToRemark(
+                    remarkId: remark.id,
+                    response: responseController.text.trim(),
+                  );
+                  if (!mounted) return;
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✅ تم إرسال الرد بنجاح'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text('إرسال'),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.bold,
-          ),
+  Future<void> _changeStatus(String remarkId, String newStatus) async {
+    bool success = await _remarkService.changeStatus(remarkId, newStatus);
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ تم تحديث الحالة بنجاح'),
+          backgroundColor: Colors.green,
         ),
-        SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(fontSize: 14),
-        ),
-      ],
-    );
+      );
+    }
   }
 
-  String _getTypeLabel(String type) {
-    switch (type) {
-      case 'suggestion':
-        return 'اقتراح';
-      case 'problem':
-        return 'مشكلة';
-      case 'question':
-        return 'سؤال';
-      default:
-        return 'أخرى';
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 1) {
+      return 'الآن';
+    } else if (diff.inHours < 1) {
+      return 'منذ ${diff.inMinutes} دقيقة';
+    } else if (diff.inHours < 24) {
+      return 'منذ ${diff.inHours} ساعة';
+    } else if (diff.inDays < 7) {
+      return 'منذ ${diff.inDays} يوم';
+    } else {
+      return DateFormat('yyyy/MM/dd').format(date);
     }
   }
 }
