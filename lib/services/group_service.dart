@@ -309,4 +309,64 @@ class GroupService {
       return null;
     }
   }
+
+  /// Nettoyer un groupe en retirant les étudiants inexistants
+  Future<bool> cleanGroupStudents(String groupId) async {
+    try {
+      print('🧹 Nettoyage du groupe $groupId...');
+      
+      DocumentSnapshot groupDoc = await _firestore
+          .collection('groups')
+          .doc(groupId)
+          .get();
+      
+      if (!groupDoc.exists) {
+        print('❌ Groupe $groupId inexistant');
+        return false;
+      }
+      
+      List<String> studentIds = List<String>.from(
+        (groupDoc.data() as Map<String, dynamic>)['studentIds'] ?? []
+      );
+      
+      print('📋 Étudiants actuels: ${studentIds.length}');
+      
+      // Vérifier chaque étudiant
+      List<String> validStudentIds = [];
+      
+      for (String studentId in studentIds) {
+        DocumentSnapshot studentDoc = await _firestore
+            .collection('users')
+            .doc(studentId)
+            .get();
+        
+        if (studentDoc.exists) {
+          Map<String, dynamic>? data = studentDoc.data() as Map<String, dynamic>?;
+          bool isActive = data?['isActive'] ?? false;
+          
+          if (isActive) {
+            validStudentIds.add(studentId);
+          } else {
+            print('⚠️  Étudiant $studentId inactif');
+          }
+        } else {
+          print('❌ Étudiant $studentId inexistant');
+        }
+      }
+      
+      print('✅ Étudiants valides: ${validStudentIds.length}');
+      
+      // Mettre à jour le groupe avec seulement les étudiants valides
+      await _firestore.collection('groups').doc(groupId).update({
+        'studentIds': validStudentIds
+      });
+      
+      print('✅ Groupe $groupId nettoyé avec succès');
+      return true;
+    } catch (e) {
+      print('❌ Erreur cleanGroupStudents: $e');
+      return false;
+    }
+  }
+  
 }

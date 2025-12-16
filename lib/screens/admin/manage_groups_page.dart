@@ -785,18 +785,54 @@ class _ManageGroupsPageState extends State<ManageGroupsPage> {
     );
   }
 
-  // Supprimer un groupe
   Future<void> _handleDeleteGroup(GroupModel group) async {
-    if (group.studentIds.isNotEmpty) {
-      // Le groupe a des étudiants, on doit les transférer
-      _showTransferStudentsDialog(group);
+    // ✅ AJOUT : Nettoyer d'abord le groupe
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'جاري التحقق من بيانات المجموعة...',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await _groupService.cleanGroupStudents(group.id);
+    
+    // Récupérer les données à jour
+    GroupModel? updatedGroup = await _groupService.getGroupById(group.id);
+    
+    if (!mounted) return;
+    Navigator.pop(context); // Fermer le loader
+    
+    if (updatedGroup == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ المجموعة غير موجودة'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (updatedGroup.studentIds.isNotEmpty) {
+      // Le groupe a des étudiants valides, on doit les transférer
+      _showTransferStudentsDialog(updatedGroup);
     } else {
       // Le groupe est vide, on peut supprimer directement
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text('تأكيد الحذف'),
-          content: Text('هل أنت متأكد من حذف المجموعة ${group.name}؟'),
+          content: Text('هل أنت متأكد من حذف المجموعة ${updatedGroup.name}؟\n\nالمجموعة فارغة.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -806,9 +842,11 @@ class _ManageGroupsPageState extends State<ManageGroupsPage> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () async {
                 Navigator.pop(ctx);
-                bool success = await _groupService.deleteGroup(group.id);
+                bool success = await _groupService.deleteGroup(updatedGroup.id);
+                
+                if (!mounted) return;
                 if (success) {
-                  await ActivityService().logGroupDeleted(group.id, group.name);
+                  await ActivityService().logGroupDeleted(updatedGroup.id, updatedGroup.name);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('✅ تم حذف المجموعة بنجاح'),

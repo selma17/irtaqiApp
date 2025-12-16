@@ -36,14 +36,17 @@ class _AdminPageState extends State<AdminPage> {
 
   Future<void> _loadStats() async {
     try {
+      // ✅ CORRECTION: Compter seulement les utilisateurs actifs
       final studentsSnapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'etudiant')
+          .where('isActive', isEqualTo: true)  // ← AJOUT ICI
           .get();
       
       final teachersSnapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'prof')
+          .where('isActive', isEqualTo: true)  // ← AJOUT ICI
           .get();
       
       final groupsSnapshot = await _firestore
@@ -56,8 +59,10 @@ class _AdminPageState extends State<AdminPage> {
         totalGroups = groupsSnapshot.docs.length;
         isLoading = false;
       });
+      
+      print('✅ Stats: $totalStudents étudiants, $totalTeachers profs, $totalGroups groupes');
     } catch (e) {
-      print('Erreur chargement stats: $e');
+      print('❌ Erreur stats: $e');
       setState(() => isLoading = false);
     }
   }
@@ -366,7 +371,7 @@ class _AdminPageState extends State<AdminPage> {
           ),
           SizedBox(height: 20),
           SizedBox(
-            height: 200,
+            height: 220,
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: StatsService().getStudentsGrowth(),
               builder: (context, snapshot) {
@@ -385,25 +390,50 @@ class _AdminPageState extends State<AdminPage> {
                   );
                 }
 
+                int visibleMonths = 3;
+                bool hasMoreData = data.length > visibleMonths;
+
+                double chartWidth = data.length > visibleMonths 
+                    ? (data.length * 100.0)
+                    : MediaQuery.of(context).size.width - 80;
+
                 List<FlSpot> spots = [];
                 for (int i = 0; i < data.length; i++) {
                   spots.add(FlSpot(i.toDouble(), data[i]['count'].toDouble()));
                 }
 
-                return LineChart(
+                Widget chart = LineChart(
                   LineChartData(
-                    gridData: FlGridData(show: false),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: 1,
+                      getDrawingHorizontalLine: (value) {
+                        return FlLine(
+                          color: Colors.grey.withOpacity(0.1),
+                          strokeWidth: 1,
+                        );
+                      },
+                    ),
                     titlesData: FlTitlesData(
                       rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          reservedSize: 30,
+                          reservedSize: 35,
+                          interval: 1,
                           getTitlesWidget: (value, meta) {
-                            return Text(
-                              value.toInt().toString(),
-                              style: TextStyle(fontSize: 10, color: Colors.grey),
+                            return Padding(
+                              padding: EdgeInsets.only(left: 8),
+                              child: Text(
+                                value.toInt().toString(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -411,14 +441,21 @@ class _AdminPageState extends State<AdminPage> {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          reservedSize: 35,
+                          interval: 1,
                           getTitlesWidget: (value, meta) {
                             int index = value.toInt();
                             if (index >= 0 && index < data.length) {
                               return Padding(
-                                padding: EdgeInsets.only(top: 8),
+                                padding: EdgeInsets.only(top: 10),
                                 child: Text(
                                   data[index]['monthName'],
-                                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               );
                             }
@@ -427,21 +464,89 @@ class _AdminPageState extends State<AdminPage> {
                         ),
                       ),
                     ),
-                    borderData: FlBorderData(show: false),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[300]!, width: 1),
+                        bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                      ),
+                    ),
+                    minX: 0,
+                    maxX: (data.length - 1).toDouble(),
+                    minY: 0,
+                    maxY: (data.map((d) => d['count'] as int).reduce((a, b) => a > b ? a : b) + 2).toDouble(),
                     lineBarsData: [
                       LineChartBarData(
                         spots: spots,
                         isCurved: true,
                         color: Color(0xFF4F6F52),
                         barWidth: 3,
-                        dotData: FlDotData(show: true),
+                        isStrokeCapRound: true,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, barData, index) {
+                            return FlDotCirclePainter(
+                              radius: 5,
+                              color: Color(0xFF4F6F52),
+                              strokeWidth: 2,
+                              strokeColor: Colors.white,
+                            );
+                          },
+                        ),
                         belowBarData: BarAreaData(
                           show: true,
-                          color: Color(0xFF4F6F52).withOpacity(0.1),
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF4F6F52).withOpacity(0.3),
+                              Color(0xFF4F6F52).withOpacity(0.05),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                         ),
                       ),
                     ],
+                    // ✅ Tooltip simplifié - compatible avec fl_chart 0.68.0
+                    lineTouchData: LineTouchData(
+                      enabled: true,
+                      handleBuiltInTouches: true,
+                    ),
                   ),
+                );
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: hasMoreData
+                          ? SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              reverse: true,
+                              child: Container(
+                                width: chartWidth,
+                                padding: EdgeInsets.only(right: 20, left: 20),
+                                child: chart,
+                              ),
+                            )
+                          : chart,
+                    ),
+                    if (hasMoreData) ...[
+                      SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.swipe_left, size: 16, color: Colors.grey[400]),
+                          SizedBox(width: 4),
+                          Text(
+                            'اسحب يمينًا لرؤية الأشهر السابقة (${data.length} أشهر)',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 );
               },
             ),
@@ -488,7 +593,7 @@ class _AdminPageState extends State<AdminPage> {
             stream: _firestore
                 .collection('activities')
                 .orderBy('createdAt', descending: true)
-                .limit(10) // Augmenté de 5 à 10
+                .limit(5) // Augmenté de 5 à 10
                 .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
@@ -688,13 +793,39 @@ class _AdminPageState extends State<AdminPage> {
                 );
               }
 
+              // ✅ FILTRER: Seulement les 7 derniers jours
+              final now = DateTime.now();
+              final oneWeekAgo = now.subtract(Duration(days: 7));
+              
+              final recentDocs = snapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                Timestamp? timestamp = data['createdAt'] as Timestamp?;
+                
+                if (timestamp == null) return false;
+                
+                DateTime activityDate = timestamp.toDate();
+                return activityDate.isAfter(oneWeekAgo);
+              }).take(5).toList();
+              
+              if (recentDocs.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'لا توجد نشاطات حديثة',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
+
               return ListView.separated(
                 shrinkWrap: true,
                 physics: NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.docs.length,
+                itemCount: recentDocs.length,
                 separatorBuilder: (context, index) => Divider(height: 20),
                 itemBuilder: (context, index) {
-                  final doc = snapshot.data!.docs[index];
+                  final doc = recentDocs[index]; 
                   final data = doc.data() as Map<String, dynamic>;
                   
                   String subject = data['subject'] ?? '';

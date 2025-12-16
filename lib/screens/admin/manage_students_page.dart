@@ -570,6 +570,18 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
         city: city,
       );
 
+      // ✅ AJOUT : Mettre à jour le groupe
+      if (result['success'] && groupId != null && groupId.isNotEmpty) {
+        String studentId = result['user'].uid;
+        
+        await _firestore.collection('groups').doc(groupId).update({
+          'studentIds': FieldValue.arrayUnion([studentId])
+        });
+        
+        print('✅ Étudiant $studentId ajouté au groupe $groupId');
+      }
+
+      if (!mounted) return;
       Navigator.pop(context);
 
       if (result['success']) {
@@ -578,6 +590,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
           '$firstName $lastName',
         );
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ تم إضافة الطالب بنجاح'),
@@ -585,6 +598,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
           ),
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ ${result['message']}'),
@@ -593,6 +607,8 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
         );
       }
     } catch (e) {
+      print('❌ Erreur _addStudent: $e');
+      if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -794,9 +810,21 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
     String city,
     int oldHafd,
     int newHafd,
-    String? groupId,
+    String? newGroupId,
   ) async {
     try {
+      // ✅ AJOUT : Récupérer l'ancien groupe
+      DocumentSnapshot studentDoc = await _firestore
+          .collection('users')
+          .doc(studentId)
+          .get();
+      
+      String? oldGroupId;
+      if (studentDoc.exists) {
+        Map<String, dynamic>? data = studentDoc.data() as Map<String, dynamic>?;
+        oldGroupId = data?['groupId'];
+      }
+
       int totalHafd = oldHafd + newHafd;
       
       await _firestore.collection('users').doc(studentId).update({
@@ -807,14 +835,34 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
         'city': city,
         'oldHafd': oldHafd,
         'totalHafd': totalHafd,
-        'groupId': groupId,
+        'groupId': newGroupId,
       });
+
+      // ✅ AJOUT : Gérer le changement de groupe
+      if (oldGroupId != newGroupId) {
+        // Retirer de l'ancien groupe
+        if (oldGroupId != null && oldGroupId.isNotEmpty) {
+          await _firestore.collection('groups').doc(oldGroupId).update({
+            'studentIds': FieldValue.arrayRemove([studentId])
+          });
+          print('✅ Retiré du groupe $oldGroupId');
+        }
+        
+        // Ajouter au nouveau groupe
+        if (newGroupId != null && newGroupId.isNotEmpty) {
+          await _firestore.collection('groups').doc(newGroupId).update({
+            'studentIds': FieldValue.arrayUnion([studentId])
+          });
+          print('✅ Ajouté au groupe $newGroupId');
+        }
+      }
 
       await ActivityService().logStudentUpdated(
         studentId,
         '$firstName $lastName',
       );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('✅ تم تحديث بيانات الطالب بنجاح'),
@@ -822,6 +870,8 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
         ),
       );
     } catch (e) {
+      print('❌ Erreur _updateStudent: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ حدث خطأ: $e'),
