@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../../services/activity_service.dart';
 import '../../models/user_model.dart';
+import '../view_followup_page.dart'; 
 
 class ManageStudentsPage extends StatefulWidget {
   @override
@@ -205,7 +206,35 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                               ),
                               cells: [
                                 DataCell(Text((index + 1).toString())),
-                                DataCell(Text(student.fullName, style: TextStyle(fontWeight: FontWeight.w600))),
+                                DataCell(
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ViewFollowupPage(
+                                            studentId: student.id,
+                                            studentName: student.fullName,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          student.fullName, 
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF4F6F52),
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.event_note, size: 16, color: Color(0xFF4F6F52)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                                 DataCell(Text(student.email, style: TextStyle(color: Colors.grey[700]))),
                                 DataCell(Text(student.phone)),
                                 DataCell(Text(student.age?.toString() ?? '-')),
@@ -278,6 +307,22 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: Icon(Icons.event_note, size: 20),
+                                        color: Colors.blue,
+                                        tooltip: 'فيشات المتابعة',
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => ViewFollowupPage(
+                                                studentId: student.id,
+                                                studentName: student.fullName,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                       IconButton(
                                         icon: Icon(Icons.edit, size: 20),
                                         color: Color(0xFF4F6F52),

@@ -1,4 +1,4 @@
-// lib/screens/all_students_page.dart - VERSION FINALE AVEC studentId
+// lib/screens/all_students_page.dart - VERSION FIRESTORE
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,6 +17,7 @@ class AllStudentsPage extends StatelessWidget {
           backgroundColor: Color(0xFF4F6F52),
         ),
         body: StreamBuilder<QuerySnapshot>(
+          // ✅ Récupère les étudiants depuis Firestore
           stream: _firestore
               .collection('users')
               .where('role', isEqualTo: 'etudiant')
@@ -24,7 +25,7 @@ class AllStudentsPage extends StatelessWidget {
               .orderBy('firstName')
               .snapshots(),
           builder: (context, snapshot) {
-            // Loading
+            // Chargement
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator());
             }
@@ -35,18 +36,9 @@ class AllStudentsPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 60, color: Colors.red),
+                    Icon(Icons.error, size: 60, color: Colors.red),
                     SizedBox(height: 16),
-                    Text(
-                      'حدث خطأ في تحميل البيانات',
-                      style: TextStyle(fontSize: 16, color: Colors.red),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      snapshot.error.toString(),
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
+                    Text('حدث خطأ في تحميل البيانات'),
                   ],
                 ),
               );
@@ -61,55 +53,58 @@ class AllStudentsPage extends StatelessWidget {
                     Icon(Icons.school_outlined, size: 80, color: Colors.grey),
                     SizedBox(height: 16),
                     Text(
-                      'لا يوجد طلاب مسجلين',
+                      'لا يوجد طلاب حالياً',
                       style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'يمكن للإدارة إضافة طلاب جدد',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                   ],
                 ),
               );
             }
 
-            // Données disponibles
-            List<DocumentSnapshot> studentsDocs = snapshot.data!.docs;
+            // ✅ Données disponibles
+            List<QueryDocumentSnapshot> students = snapshot.data!.docs;
 
             return Padding(
               padding: EdgeInsets.all(16),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
-                  headingRowColor: MaterialStateProperty.all(
-                    Color(0xFF4F6F52).withOpacity(0.1),
-                  ),
                   columns: [
-                    DataColumn(label: Text("رقم", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("الاسم", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("اللقب", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("العمر", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("الهاتف", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("البريد", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("المجموعة", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("الحفظ القديم", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("الحفظ الجديد", style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text("المجموع", style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text("رقم")),
+                    DataColumn(label: Text("الاسم")),
+                    DataColumn(label: Text("اللقب")),
+                    DataColumn(label: Text("العمر")),
+                    DataColumn(label: Text("الهاتف")),
+                    DataColumn(label: Text("البريد")),
+                    DataColumn(label: Text("تاريخ الانضمام")),
+                    DataColumn(label: Text("الحفظ الحالي")),
                   ],
                   rows: List.generate(
-                    studentsDocs.length,
+                    students.length,
                     (index) {
-                      DocumentSnapshot doc = studentsDocs[index];
-                      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-                      String studentId = doc.id;  // ✅ ID Firebase réel
+                      // ✅ Récupère le document et les données
+                      var doc = students[index];
+                      var data = doc.data() as Map<String, dynamic>;
+                      
+                      // ✅ L'ID Firebase (UID) est dans doc.id
+                      String studentId = doc.id;
+                      
+                      // Données de l'étudiant
                       String firstName = data['firstName'] ?? '';
                       String lastName = data['lastName'] ?? '';
                       int age = data['age'] ?? 0;
                       String phone = data['phone'] ?? '';
                       String email = data['email'] ?? '';
-                      String groupId = data['groupId'] ?? '';
+                      
+                      // Date d'inscription
+                      String dateInscription = '';
+                      if (data['dateInscription'] != null) {
+                        Timestamp timestamp = data['dateInscription'];
+                        DateTime date = timestamp.toDate();
+                        dateInscription = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                      }
+                      
+                      // Calcul du hafđ total
                       int oldHafd = data['oldHafd'] ?? 0;
                       int newHafd = data['newHafd'] ?? 0;
                       int totalHafd = oldHafd + newHafd;
@@ -118,126 +113,45 @@ class AllStudentsPage extends StatelessWidget {
                         cells: [
                           DataCell(Text((index + 1).toString())),
                           
-                          // NOM cliquable
+                          // ✅ Cellule du prénom - CLIQUABLE
                           DataCell(
-                            InkWell(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => FollowStudentPage(
-                                      studentId: studentId,  // ✅ AJOUTÉ
-                                      firstName: firstName,
-                                      lastName: lastName,
-                                    ),
+                            Text(firstName),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FollowStudentPage(
+                                    studentId: studentId,  // ✅ UID Firebase
+                                    firstName: firstName,
+                                    lastName: lastName,
                                   ),
-                                );
-                              },
-                              child: Text(
-                                firstName,
-                                style: TextStyle(
-                                  color: Color(0xFF4F6F52),
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.underline,
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                           
-                          // PRÉNOM cliquable
+                          // ✅ Cellule du nom - CLIQUABLE
                           DataCell(
-                            InkWell(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => FollowStudentPage(
-                                      studentId: studentId,  // ✅ AJOUTÉ
-                                      firstName: firstName,
-                                      lastName: lastName,
-                                    ),
+                            Text(lastName),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FollowStudentPage(
+                                    studentId: studentId,  // ✅ UID Firebase
+                                    firstName: firstName,
+                                    lastName: lastName,
                                   ),
-                                );
-                              },
-                              child: Text(
-                                lastName,
-                                style: TextStyle(
-                                  color: Color(0xFF4F6F52),
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.underline,
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                           
                           DataCell(Text(age.toString())),
                           DataCell(Text(phone)),
                           DataCell(Text(email)),
-                          
-                          // GROUPE (avec fetch nom)
-                          DataCell(
-                            FutureBuilder<String>(
-                              future: _getGroupName(groupId),
-                              builder: (context, groupSnapshot) {
-                                if (groupSnapshot.connectionState == ConnectionState.waiting) {
-                                  return SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  );
-                                }
-                                return Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: groupSnapshot.data != 'بدون مجموعة'
-                                        ? Color(0xFF4F6F52).withOpacity(0.2)
-                                        : Colors.orange.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    groupSnapshot.data ?? 'بدون مجموعة',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          
-                          DataCell(
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('$oldHafd/60'),
-                            ),
-                          ),
-                          
-                          DataCell(
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('$newHafd/60'),
-                            ),
-                          ),
-                          
-                          DataCell(
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '$totalHafd/60',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
+                          DataCell(Text(dateInscription)),
+                          DataCell(Text(totalHafd.clamp(0, 60).toString())),
                         ],
                       );
                     },
@@ -249,27 +163,5 @@ class AllStudentsPage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  /// Récupérer nom du groupe
-  Future<String> _getGroupName(String? groupId) async {
-    if (groupId == null || groupId.isEmpty) {
-      return 'بدون مجموعة';
-    }
-
-    try {
-      DocumentSnapshot groupDoc = await _firestore
-          .collection('groups')
-          .doc(groupId)
-          .get();
-
-      if (groupDoc.exists) {
-        return (groupDoc.data() as Map<String, dynamic>)['name'] ?? 'بدون مجموعة';
-      }
-    } catch (e) {
-      print('❌ Erreur get group name: $e');
-    }
-
-    return 'بدون مجموعة';
   }
 }
