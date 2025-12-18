@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../services/activity_service.dart';
 import '../../models/user_model.dart';
 import '../view_followup_page.dart'; 
+import '../student/my_followup_list_page.dart'; 
 
 class ManageStudentsPage extends StatefulWidget {
   @override
@@ -212,9 +213,8 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => ViewFollowupPage(
+                                          builder: (_) => MyFollowupListPage(
                                             studentId: student.id,
-                                            studentName: student.fullName,
                                           ),
                                         ),
                                       );
@@ -315,9 +315,8 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => ViewFollowupPage(
+                                              builder: (_) => MyFollowupListPage(
                                                 studentId: student.id,
-                                                studentName: student.fullName,
                                               ),
                                             ),
                                           );

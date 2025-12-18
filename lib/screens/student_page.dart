@@ -1,45 +1,89 @@
-// lib/screens/student_page.dart - VERSION MODIFIÉE
+// lib/screens/student/student_dashboard.dart
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/auth_service.dart';
+import '../../models/user_model.dart';
 import 'login_page.dart';
-import 'view_followup_page.dart';  // ✅ NOUVEAU
+import 'student/student_profile_card_page.dart';
+import 'student/student_tracking_summary_page.dart';
+import 'student/counter_page.dart';
+import 'student/send_remark_page.dart';
+import 'student/account_settings_page.dart';
 
-class StudentPage extends StatelessWidget {
+class StudentPage extends StatefulWidget {
+  @override
+  _StudentPageState createState() => _StudentPageState();
+}
+
+class _StudentPageState extends State<StudentPage> {
   final AuthService _authService = AuthService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  UserModel? currentUser;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      String? userId = _authService.getCurrentUserId();
+      if (userId != null) {
+        DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
+        if (doc.exists) {
+          setState(() {
+            currentUser = UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Erreur chargement données: $e');
+      setState(() => isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Récupérer l'utilisateur actuel
-    User? currentUser = _authService.currentUser;
-    String studentId = currentUser?.uid ?? '';
-    String studentEmail = currentUser?.email ?? '';
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: Color(0xFFF6F3EE),
         appBar: AppBar(
-          title: Text("واجهة الطالب"),
+          title: Text('الصفحة الرئيسية'),
           backgroundColor: Color(0xFF4F6F52),
+          elevation: 0,
         ),
-        drawer: _buildDrawer(context, studentId, studentEmail),  // ✅ Drawer avec navigation
-        body: Center(
-          child: Text(
-            "أهلا بك، أيها الطالب",
-            style: TextStyle(fontSize: 20, color: Color(0xFF4F6F52)),
-          ),
-        ),
+        drawer: _buildDrawer(),
+        body: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildWelcomeCard(),
+                    SizedBox(height: 20),
+                    _buildProgressCard(),
+                    SizedBox(height: 20),
+                    _buildQuickActions(),
+                    SizedBox(height: 20),
+                    _buildAnnouncements(),
+                  ],
+                ),
+              ),
       ),
     );
   }
 
-  Widget _buildDrawer(BuildContext context, String studentId, String studentEmail) {
+  Widget _buildDrawer() {
     return Drawer(
       child: Column(
         children: [
-          // Header
           Container(
             width: double.infinity,
             padding: EdgeInsets.fromLTRB(20, 50, 20, 20),
@@ -54,140 +98,120 @@ class StudentPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 30,
+                  radius: 35,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: 30,
-                    color: Color(0xFF4F6F52),
-                  ),
+                  backgroundImage: currentUser?.profileImage != null
+                      ? NetworkImage(currentUser!.profileImage!)
+                      : null,
+                  child: currentUser?.profileImage == null
+                      ? Icon(
+                          Icons.person,
+                          size: 35,
+                          color: Color(0xFF4F6F52),
+                        )
+                      : null,
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'حساب الطالب',
+                  currentUser?.fullName ?? 'الطالب',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  studentEmail,
+                  currentUser?.email ?? '',
                   style: TextStyle(
                     color: Colors.white70,
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-
           SizedBox(height: 10),
-
-          // Menu items
           Expanded(
             child: ListView(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               children: [
                 _buildDrawerItem(
-                  context,
-                  icon: Icons.dashboard,
+                  icon: Icons.home,
                   title: 'الرئيسية',
                   onTap: () => Navigator.pop(context),
                 ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'المتابعة',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-
-                // ✅ NOUVEAU: Fiches de suivi
                 _buildDrawerItem(
-                  context,
-                  icon: Icons.event_note,
-                  title: 'فيشات متابعتي',
+                  icon: Icons.badge,
+                  title: 'الفيش الشخصي',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ViewFollowupPage(
-                          studentId: studentId,
-                          studentName: 'أنا',  // Ou récupérer le nom réel
-                        ),
+                        builder: (_) => StudentProfileCardPage(),
                       ),
                     );
                   },
                 ),
-
                 _buildDrawerItem(
-                  context,
-                  icon: Icons.book,
-                  title: 'تقدمي في الحفظ',
+                  icon: Icons.assessment,
+                  title: 'فيش المتابعة',
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Navigate to progress page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StudentTrackingSummaryPage(),
+                      ),
+                    );
                   },
                 ),
-
                 _buildDrawerItem(
-                  context,
-                  icon: Icons.analytics,
-                  title: 'إحصائياتي',
+                  icon: Icons.calculate,
+                  title: 'العداد',
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Navigate to stats page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CounterPage(),
+                      ),
+                    );
                   },
                 ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'الإعدادات',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-
                 _buildDrawerItem(
-                  context,
-                  icon: Icons.person,
-                  title: 'ملفي الشخصي',
+                  icon: Icons.message,
+                  title: 'إرسال ملاحظة',
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Navigate to profile page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SendRemarkPage(),
+                      ),
+                    );
                   },
                 ),
-
+                Divider(height: 24, thickness: 1, indent: 16, endIndent: 16),
                 _buildDrawerItem(
-                  context,
-                  icon: Icons.notifications,
-                  title: 'الإشعارات',
+                  icon: Icons.settings,
+                  title: 'إعدادات الحساب',
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Navigate to notifications page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AccountSettingsPage(),
+                      ),
+                    );
                   },
                 ),
               ],
             ),
           ),
-
-          // Logout
           Divider(height: 1),
           _buildDrawerItem(
-            context,
             icon: Icons.logout,
             title: 'تسجيل الخروج',
             isLogout: true,
@@ -205,8 +229,7 @@ class StudentPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDrawerItem(
-    BuildContext context, {
+  Widget _buildDrawerItem({
     required IconData icon,
     required String title,
     required VoidCallback onTap,
@@ -214,9 +237,6 @@ class StudentPage extends StatelessWidget {
   }) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: ListTile(
         leading: Icon(
           icon,
@@ -235,8 +255,282 @@ class StudentPage extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         onTap: onTap,
-        hoverColor: Color(0xFF4F6F52).withOpacity(0.1),
-        selectedTileColor: Color(0xFF4F6F52).withOpacity(0.1),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeCard() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFF4F6F52).withOpacity(0.3),
+            blurRadius: 10,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.waving_hand, color: Colors.white, size: 32),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'مرحباً بك',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  currentUser?.firstName ?? 'الطالب',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressCard() {
+    int oldHafd = currentUser?.oldHafd ?? 0;
+    int newHafd = currentUser?.newHafd ?? 0;
+    int totalHafd = oldHafd + newHafd;
+    double progress = totalHafd / 60;
+
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.book, color: Color(0xFF4F6F52)),
+              SizedBox(width: 8),
+              Text(
+                'تقدم الحفظ',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4F6F52),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem('الحفظ السابق', '$oldHafd', Colors.grey),
+              Container(width: 1, height: 40, color: Colors.grey[300]),
+              _buildStatItem('الحفظ الجديد', '$newHafd', Colors.green),
+              Container(width: 1, height: 40, color: Colors.grey[300]),
+              _buildStatItem('المجموع', '$totalHafd/60', Colors.blue),
+            ],
+          ),
+          SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 12,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F6F52)),
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            '${(progress * 100).toStringAsFixed(1)}% من القرآن الكريم',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'الإجراءات السريعة',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF4F6F52),
+          ),
+        ),
+        SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.calculate,
+                title: 'العداد',
+                color: Colors.blue,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => CounterPage()),
+                  );
+                },
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.assessment,
+                title: 'المتابعة',
+                color: Colors.orange,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => StudentTrackingSummaryPage()),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 32),
+            SizedBox(height: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnnouncements() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notifications, color: Color(0xFF4F6F52)),
+              SizedBox(width: 8),
+              Text(
+                'الإعلانات',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4F6F52),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Center(
+            child: Column(
+              children: [
+                Icon(Icons.inbox, size: 60, color: Colors.grey[300]),
+                SizedBox(height: 8),
+                Text(
+                  'لا توجد إعلانات حالياً',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
