@@ -10,6 +10,7 @@ import 'student/student_tracking_summary_page.dart';
 import 'student/counter_page.dart';
 import 'student/send_remark_page.dart';
 import 'student/account_settings_page.dart';
+import 'student/student_exams_page.dart';
 
 class StudentPage extends StatefulWidget {
   @override
@@ -189,6 +190,19 @@ class _StudentPageState extends State<StudentPage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => SendRemarkPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.quiz,
+                  title: 'الامتحانات',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StudentExamsPage(),
                       ),
                     );
                   },
