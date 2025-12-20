@@ -157,66 +157,194 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
 
             List<QueryDocumentSnapshot> groupDocs = snapshot.data!.docs;
 
+            // Si aucun groupe sélectionné, afficher la liste des groupes
+            if (selectedGroupId == null) {
+              return _buildGroupsList(groupDocs);
+            }
+
+            // Si un groupe est sélectionné, afficher les onglets
             return Column(
               children: [
-                // Sélecteur de groupe
+                // Barre avec le groupe sélectionné
                 Container(
                   padding: EdgeInsets.all(16),
-                  color: Colors.white,
-                  child: DropdownButtonFormField<String>(
-                    decoration: InputDecoration(
-                      labelText: "اختر المجموعة",
-                      prefixIcon: Icon(Icons.group, color: Color(0xFF4F6F52)),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Color(0xFF4F6F52), width: 2),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Bouton retour
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            selectedGroupId = null;
+                            selectedGroupData = null;
+                            groupStudents.clear();
+                            attendanceSheets.clear();
+                          });
+                        },
+                        icon: Icon(Icons.arrow_back, color: Color(0xFF4F6F52)),
+                        tooltip: 'العودة للمجموعات',
                       ),
-                    ),
-                    value: selectedGroupId,
-                    items: groupDocs.map((doc) {
-                      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-                      return DropdownMenuItem(
-                        value: doc.id,
-                        child: Text(data['name'] ?? 'مجموعة بدون اسم'),
-                      );
-                    }).toList(),
-                    onChanged: (value) async {
-                      setState(() {
-                        selectedGroupId = value;
-                        isLoadingStudents = true;
-                      });
-                      await _loadGroupDetails(value!);
-                      await _loadExistingSheets();
-                    },
+                      SizedBox(width: 12),
+                      // Nom du groupe sélectionné
+                      Expanded(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.group, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  selectedGroupData?['name'] ?? 'مجموعة',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${groupStudents.length} طالب',
+                                  style: TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
                 // Contenu des onglets
-                if (selectedGroupData != null)
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildInfoTab(),
-                        _buildAttendanceTab(),
-                      ],
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'الرجاء اختيار مجموعة',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildInfoTab(),
+                      _buildAttendanceTab(),
+                    ],
                   ),
+                ),
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  // Nouvelle méthode : Afficher la liste des groupes
+  Widget _buildGroupsList(List<QueryDocumentSnapshot> groupDocs) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'اختر مجموعة',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4F6F52),
+            ),
+          ),
+          SizedBox(height: 16),
+          ...groupDocs.map((doc) {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            return _buildGroupCard(doc.id, data);
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  // Carte de groupe
+  Widget _buildGroupCard(String groupId, Map<String, dynamic> groupData) {
+    return InkWell(
+      onTap: () async {
+        setState(() {
+          selectedGroupId = groupId;
+          isLoadingStudents = true;
+        });
+        await _loadGroupDetails(groupId);
+        await _loadExistingSheets();
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 16),
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFF4F6F52).withOpacity(0.3),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.groups, color: Colors.white, size: 40),
+            ),
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    groupData['name'] ?? 'مجموعة بدون اسم',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'انقر للدخول',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_back_ios, color: Colors.white, size: 24),
+          ],
         ),
       ),
     );
@@ -457,18 +585,34 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
             children: [
               Expanded(
                 child: Container(
-                  padding: EdgeInsets.all(10),
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.green[100],
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    "الشهر: ${_getMonthName(month)}",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isSaved ? Colors.grey.shade700 : Colors.black,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: DropdownButton<String>(
+                    value: month,
+                    isExpanded: true,
+                    underline: SizedBox(),
+                    onChanged: isSaved
+                        ? null
+                        : (val) {
+                            setState(() {
+                              sheet["month"] = val!;
+                            });
+                          },
+                    items: months.map((m) {
+                      return DropdownMenuItem(
+                        value: m,
+                        child: Text(
+                          _getMonthName(m),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isSaved ? Colors.grey.shade700 : Colors.black,
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
