@@ -3,6 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../models/user_model.dart';
 
 class TeacherProfilePage extends StatefulWidget {
@@ -13,11 +16,15 @@ class TeacherProfilePage extends StatefulWidget {
 class _TeacherProfilePageState extends State<TeacherProfilePage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _picker = ImagePicker();
 
   UserModel? currentUser;
   int totalGroups = 0;
   int totalStudents = 0;
   bool isLoading = true;
+  bool isUploadingPhoto = false;
+  String? photoUrl;
 
   @override
   void initState() {
@@ -30,14 +37,14 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
       String? userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
-      // Charger les données utilisateur
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
       
       if (userDoc.exists) {
-        currentUser = UserModel.fromMap(userDoc.id, userDoc.data() as Map<String, dynamic>);
+        Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
+        currentUser = UserModel.fromMap(userDoc.id, data);
+        photoUrl = data['photoUrl'];
       }
 
-      // Compter les groupes
       QuerySnapshot groupsSnapshot = await _firestore
           .collection('groups')
           .where('profId', isEqualTo: userId)
@@ -45,7 +52,6 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
 
       totalGroups = groupsSnapshot.docs.length;
       
-      // Compter les étudiants
       int studentCount = 0;
       for (var groupDoc in groupsSnapshot.docs) {
         Map<String, dynamic> data = groupDoc.data() as Map<String, dynamic>;
@@ -65,6 +71,111 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
     }
   }
 
+  Future<void> _pickAndUploadImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        isUploadingPhoto = true;
+      });
+
+      String userId = _auth.currentUser!.uid;
+      String fileName = 'profile_$userId.jpg';
+      Reference ref = _storage.ref().child('profile_photos/$fileName');
+      
+      await ref.putFile(File(image.path));
+      String downloadUrl = await ref.getDownloadURL();
+
+      await _firestore.collection('users').doc(userId).update({
+        'photoUrl': downloadUrl,
+      });
+
+      setState(() {
+        photoUrl = downloadUrl;
+        isUploadingPhoto = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم تحديث الصورة بنجاح'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        isUploadingPhoto = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'اختر صورة الملف الشخصي',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            ListTile(
+              leading: Icon(Icons.camera_alt, color: Color(0xFF4F6F52)),
+              title: Text('التقاط صورة'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndUploadImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library, color: Color(0xFF4F6F52)),
+              title: Text('اختيار من المعرض'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndUploadImage(ImageSource.gallery);
+              },
+            ),
+            if (photoUrl != null)
+              ListTile(
+                leading: Icon(Icons.delete, color: Colors.red),
+                title: Text('حذف الصورة'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
+                    'photoUrl': FieldValue.delete(),
+                  });
+                  setState(() {
+                    photoUrl = null;
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -74,6 +185,7 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
         appBar: AppBar(
           title: Text('الملف الشخصي'),
           backgroundColor: Color(0xFF4F6F52),
+          elevation: 0,
         ),
         body: isLoading
             ? Center(child: CircularProgressIndicator(color: Color(0xFF4F6F52)))
@@ -81,14 +193,21 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
                 onRefresh: _loadProfileData,
                 child: SingleChildScrollView(
                   physics: AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.all(16),
                   child: Column(
                     children: [
                       _buildProfileHeader(),
                       SizedBox(height: 20),
-                      _buildStatsCards(),
-                      SizedBox(height: 20),
-                      _buildInfoCard(),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            _buildStatsCards(),
+                            SizedBox(height: 16),
+                            _buildInfoCard(),
+                            SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -99,32 +218,75 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
 
   Widget _buildProfileHeader() {
     return Container(
-      padding: EdgeInsets.all(24),
+      width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF4F6F52).withOpacity(0.3),
-            blurRadius: 15,
-            offset: Offset(0, 5),
-          ),
-        ],
       ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.white,
-            child: Icon(
-              Icons.person,
-              size: 60,
-              color: Color(0xFF4F6F52),
-            ),
+          SizedBox(height: 30),
+          Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 15,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.white,
+                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+                  child: photoUrl == null
+                      ? Icon(
+                          Icons.person,
+                          size: 70,
+                          color: Color(0xFF4F6F52),
+                        )
+                      : null,
+                ),
+              ),
+              if (isUploadingPhoto)
+                Positioned.fill(
+                  child: CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.black54,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                child: GestureDetector(
+                  onTap: _showPhotoOptions,
+                  child: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF4F6F52),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Icon(
+                      Icons.camera_alt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           SizedBox(height: 16),
           Text(
@@ -142,15 +304,23 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
-              'أستاذ',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified, color: Colors.white, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'أستاذ',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
+          SizedBox(height: 30),
         ],
       ),
     );
@@ -161,19 +331,21 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
       children: [
         Expanded(
           child: _buildStatCard(
-            icon: Icons.groups,
+            icon: Icons.groups_rounded,
             title: 'المجموعات',
             value: totalGroups.toString(),
-            color: Colors.blue,
+            color: Color(0xFF4F6F52),
+            lightColor: Color(0xFFE8F5E9),
           ),
         ),
         SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
-            icon: Icons.people,
+            icon: Icons.people_rounded,
             title: 'الطلاب',
             value: totalStudents.toString(),
-            color: Colors.orange,
+            color: Color(0xFF2196F3),
+            lightColor: Color(0xFFE3F2FD),
           ),
         ),
       ],
@@ -185,17 +357,18 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
     required String title,
     required String value,
     required Color color,
+    required Color lightColor,
   }) {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
+            color: color.withOpacity(0.1),
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -204,16 +377,16 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
           Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: lightColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 32),
+            child: Icon(icon, color: color, size: 28),
           ),
           SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -222,8 +395,9 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -250,8 +424,15 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: Color(0xFF4F6F52)),
-              SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Color(0xFF4F6F52).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.info_outline, color: Color(0xFF4F6F52), size: 20),
+              ),
+              SizedBox(width: 12),
               Text(
                 'المعلومات الشخصية',
                 style: TextStyle(
@@ -299,10 +480,10 @@ class _TeacherProfilePageState extends State<TeacherProfilePage> {
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(8),
+          padding: EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: Color(0xFF4F6F52).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: Color(0xFF4F6F52), size: 20),
         ),

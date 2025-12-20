@@ -393,56 +393,149 @@ class _TeacherPageState extends State<TeacherPage> {
     );
   }
 
+  // ==================== CARTES DASHBOARD - VERSION FINALE ====================
+// Remplacer _buildStatsCards() et _buildStatCard() dans teacher_page.dart
+
   Widget _buildStatsCards() {
     if (isLoading) return Center(child: CircularProgressIndicator());
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.3,
+    return Column(
       children: [
-        _buildStatCard(title: 'مجموعاتي', count: totalGroups, icon: Icons.groups, gradient: [Color(0xFF4F6F52), Color(0xFF6B8F71)]),
-        _buildStatCard(title: 'إجمالي الطلاب', count: totalStudents, icon: Icons.school, gradient: [Color(0xFF2D5F3F), Color(0xFF4F6F52)]),
-        _buildStatCard(title: 'الاختبارات القادمة', count: 0, icon: Icons.assignment, gradient: [Color(0xFF739072), Color(0xFF86A789)], futureCount: _getUpcomingExamsCount()),
-        _buildStatCard(title: 'معدل الحفظ', count: 0, icon: Icons.trending_up, gradient: [Color(0xFF5F7A61), Color(0xFF739072)], suffix: ' حزب', futureCount: _getAverageHafd()),
+        // Première ligne - 2 cartes
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                title: 'مجموعاتي',
+                count: totalGroups,
+                icon: Icons.groups_rounded,
+                gradient: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                title: 'إجمالي الطلاب',
+                count: totalStudents,
+                icon: Icons.school_rounded,
+                gradient: [Color(0xFF5F7A61), Color(0xFF739072)],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        
+        // Deuxième ligne - 2 cartes
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                title: 'الاختبارات القادمة',
+                count: 0,
+                icon: Icons.assignment_rounded,
+                gradient: [Color(0xFF739072), Color(0xFF86A789)],
+                futureCount: _getUpcomingExamsCount(),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                title: 'معدل الحفظ',
+                count: 0,
+                icon: Icons.trending_up_rounded,
+                gradient: [Color(0xFF2D5F3F), Color(0xFF4F6F52)],
+                suffix: ' حزب',
+                futureCount: _getAverageHafd(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard({required String title, required int count, required IconData icon, required List<Color> gradient, String suffix = '', Future<int>? futureCount}) {
+  Widget _buildStatCard({
+    required String title,
+    required int count,
+    required IconData icon,
+    required List<Color> gradient,
+    String suffix = '',
+    Future<int>? futureCount,
+  }) {
     return Container(
+      height: 110, // ✅ Taille réduite (était ~130)
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: gradient, begin: Alignment.topRight, end: Alignment.bottomLeft),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: gradient[0].withOpacity(0.3), blurRadius: 10, offset: Offset(0, 5))],
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: gradient[0].withOpacity(0.3),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // En-tête : Titre + Icône
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text(title, style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500))),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(width: 8),
                 Container(
                   padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, color: Colors.white, size: 22),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 20),
                 ),
               ],
             ),
-            SizedBox(height: 8),
+            
+            // Nombre
             futureCount != null
                 ? FutureBuilder<int>(
                     future: futureCount,
-                    builder: (context, snapshot) => Text('${snapshot.data ?? count}$suffix', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                    builder: (context, snapshot) {
+                      return Text(
+                        '${snapshot.data ?? count}$suffix',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
                   )
-                : Text('$count$suffix', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                : Text(
+                    '$count$suffix',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ],
         ),
       ),
