@@ -41,10 +41,19 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
   static List<String> _generateMonths() {
     List<String> months = [];
     DateTime now = DateTime.now();
+    
+    // Générer les mois sans doublons
+    Set<String> uniqueMonths = {};
     for (int i = -6; i <= 6; i++) {
       DateTime month = DateTime(now.year, now.month + i);
-      months.add('${month.year}-${month.month.toString().padLeft(2, '0')}');
+      String monthKey = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+      uniqueMonths.add(monthKey);
     }
+    
+    // Convertir en liste et trier
+    months = uniqueMonths.toList();
+    months.sort();
+    
     return months;
   }
 
@@ -65,27 +74,43 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
       QuerySnapshot snapshot = await _firestore
           .collection('attendance')
           .where('groupId', isEqualTo: selectedGroupId)
-          .orderBy('month', descending: true)
-          .get();
+          .get(); // Pas de orderBy pour éviter les index manquants
 
       setState(() {
         attendanceSheets.clear();
         for (var doc in snapshot.docs) {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          attendanceSheets.add({
-            "docId": doc.id,
-            "month": data['month'],
-            "students": Map<String, Map<String, String>>.from(
-              (data['students'] as Map).map((key, value) =>
-                MapEntry(key, Map<String, String>.from(value as Map))
-              )
-            ),
-            "isSaved": true,
-          });
+          
+          // Vérifier que les données existent
+          if (data['month'] != null && data['students'] != null) {
+            Map<String, Map<String, String>> studentsMap = {};
+            
+            // Convertir les données en format correct
+            Map<String, dynamic> studentsData = data['students'] as Map<String, dynamic>;
+            studentsData.forEach((studentId, cellsData) {
+              if (cellsData is Map) {
+                studentsMap[studentId] = Map<String, String>.from(cellsData);
+              }
+            });
+            
+            attendanceSheets.add({
+              "docId": doc.id,
+              "month": data['month'],
+              "students": studentsMap,
+              "isSaved": true,
+            });
+          }
         }
+        
+        // Trier par mois (plus récent en premier)
+        attendanceSheets.sort((a, b) => b['month'].compareTo(a['month']));
       });
     } catch (e) {
       print('Erreur chargement fiches: $e');
+      // Ne pas bloquer l'interface si erreur
+      setState(() {
+        attendanceSheets.clear();
+      });
     }
   }
 
@@ -237,16 +262,44 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
                   ),
                 ),
 
-                // Contenu des onglets
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildInfoTab(),
-                      _buildAttendanceTab(),
-                    ],
+                // Contenu des onglets - Vérifier que tout est chargé
+                if (selectedGroupData != null && !isLoadingStudents)
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildInfoTab(),
+                        _buildAttendanceTab(),
+                      ],
+                    ),
+                  )
+                else if (isLoadingStudents)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: Color(0xFF4F6F52),
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'جاري تحميل البيانات...',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'حدث خطأ في التحميل',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   ),
-                ),
               ],
             );
           },
@@ -284,12 +337,30 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
   Widget _buildGroupCard(String groupId, Map<String, dynamic> groupData) {
     return InkWell(
       onTap: () async {
-        setState(() {
-          selectedGroupId = groupId;
-          isLoadingStudents = true;
-        });
-        await _loadGroupDetails(groupId);
-        await _loadExistingSheets();
+        try {
+          setState(() {
+            selectedGroupId = groupId;
+            selectedGroupData = groupData; // Définir immédiatement
+            isLoadingStudents = true;
+          });
+          
+          await _loadGroupDetails(groupId);
+          await _loadExistingSheets();
+        } catch (e) {
+          print('Erreur clic groupe: $e');
+          setState(() {
+            selectedGroupId = null;
+            selectedGroupData = null;
+            isLoadingStudents = false;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('حدث خطأ في تحميل المجموعة'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       },
       child: Container(
         margin: EdgeInsets.only(bottom: 16),
@@ -563,6 +634,14 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
     bool isSaved = sheet["isSaved"] ?? false;
     String? docId = sheet["docId"];
     String month = sheet["month"];
+    
+    // Vérifier que le mois existe dans la liste
+    if (!months.contains(month)) {
+      // Si le mois n'existe pas, utiliser le mois actuel
+      month = '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+      sheet["month"] = month;
+    }
+    
     Map<String, Map<String, String>> studentsData = sheet["students"];
     List<String> sessionDays = _getSessionDays();
 
@@ -659,6 +738,24 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
   }
 
   Widget _buildTable(Map<String, Map<String, String>> studentsData, List<String> sessionDays, bool isSaved) {
+    // Vérifier que les jours de session sont valides
+    if (sessionDays.isEmpty) {
+      sessionDays = ['اليوم 1', 'اليوم 2'];
+    }
+    
+    // Vérifier qu'on a des étudiants
+    if (groupStudents.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(40),
+        child: Center(
+          child: Text(
+            'لا يوجد طلاب في هذه المجموعة',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -679,7 +776,7 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
                 SizedBox(width: 150), // Espace pour les noms
                 ...List.generate(4, (week) {
                   return Container(
-                    width: 240,
+                    width: 320, // 4 cellules × 80px = 320px (au lieu de 240)
                     child: Center(
                       child: Text(
                         'الأسبوع ${week + 1}',
@@ -706,7 +803,7 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
                   return Row(
                     children: sessionDays.map((day) {
                       return Container(
-                        width: 120,
+                        width: 160, // 2 cellules × 80px = 160px (au lieu de 120)
                         child: Center(
                           child: Text(
                             day,
@@ -743,7 +840,7 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
                   return Row(
                     children: [
                       Container(
-                        width: 60,
+                        width: 80, // Au lieu de 60
                         child: Center(
                           child: Text(
                             'ت',
@@ -752,7 +849,7 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
                         ),
                       ),
                       Container(
-                        width: 60,
+                        width: 80, // Au lieu de 60
                         child: Center(
                           child: Text(
                             'و',
@@ -822,8 +919,8 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
     String value = studentCells[key] ?? '';
 
     return Container(
-      width: 60,
-      height: 50,
+      width: 80,  // Plus large (au lieu de 60)
+      height: 90, // Plus haut pour 3 lignes (au lieu de 50)
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[200]!),
         color: value.isNotEmpty 
@@ -834,12 +931,15 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
         controller: TextEditingController(text: value),
         enabled: !isSaved,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+        maxLines: 3, // Permettre 3 lignes
+        minLines: 1, // Minimum 1 ligne
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, height: 1.3),
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: EdgeInsets.all(4),
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           hintText: !isSaved ? '...' : '',
           hintStyle: TextStyle(color: Colors.grey[300], fontSize: 10),
+          isDense: true,
         ),
         onChanged: (val) {
           studentCells[key] = val;
@@ -904,35 +1004,55 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
   void _deleteSheet(int index, String? docId) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("تأكيد الحذف"),
-        content: Text("هل تريد حذف هذا الجدول؟"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("إلغاء"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text("تأكيد الحذف"),
+          content: Text("هل تريد حذف هذا الجدول؟\nلا يمكن التراجع عن هذا الإجراء."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text("إلغاء"),
             ),
-            onPressed: () async {
-              if (docId != null) {
-                try {
-                  await _firestore.collection('attendance').doc(docId).delete();
-                } catch (e) {
-                  print('Erreur suppression: $e');
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx); // Fermer le dialogue d'abord
+                
+                // Si déjà sauvegardé dans Firestore, supprimer
+                if (docId != null) {
+                  try {
+                    await _firestore.collection('attendance').doc(docId).delete();
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تم حذف الفيش من قاعدة البيانات بنجاح'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  } catch (e) {
+                    print('Erreur suppression Firestore: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('حدث خطأ في الحذف: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return; // Ne pas supprimer localement si erreur
+                  }
                 }
-              }
-              
-              setState(() {
-                attendanceSheets.removeAt(index);
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text("حذف"),
-          ),
-        ],
+                
+                // Supprimer de la liste locale
+                setState(() {
+                  attendanceSheets.removeAt(index);
+                });
+              },
+              child: Text("حذف"),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1059,23 +1179,40 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
 
   Future<void> _loadGroupDetails(String groupId) async {
     try {
+      setState(() {
+        isLoadingStudents = true;
+      });
+
       DocumentSnapshot groupDoc = await _firestore.collection('groups').doc(groupId).get();
 
       if (!groupDoc.exists) {
-        setState(() => isLoadingStudents = false);
+        setState(() {
+          isLoadingStudents = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('المجموعة غير موجودة'),
+            backgroundColor: Colors.red,
+          ),
+        );
         return;
       }
 
       Map<String, dynamic> groupData = groupDoc.data() as Map<String, dynamic>;
       List<String> studentIds = List<String>.from(groupData['studentIds'] ?? []);
 
+      // Charger les étudiants
       List<Map<String, dynamic>> students = [];
       for (String studentId in studentIds) {
-        DocumentSnapshot studentDoc = await _firestore.collection('users').doc(studentId).get();
-        if (studentDoc.exists) {
-          Map<String, dynamic> studentData = studentDoc.data() as Map<String, dynamic>;
-          studentData['id'] = studentDoc.id;
-          students.add(studentData);
+        try {
+          DocumentSnapshot studentDoc = await _firestore.collection('users').doc(studentId).get();
+          if (studentDoc.exists) {
+            Map<String, dynamic> studentData = studentDoc.data() as Map<String, dynamic>;
+            studentData['id'] = studentDoc.id;
+            students.add(studentData);
+          }
+        } catch (e) {
+          print('Erreur chargement étudiant $studentId: $e');
         }
       }
 
@@ -1086,7 +1223,16 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
       });
     } catch (e) {
       print('Erreur load group: $e');
-      setState(() => isLoadingStudents = false);
+      setState(() {
+        isLoadingStudents = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ في تحميل المجموعة'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }
