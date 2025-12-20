@@ -9,6 +9,11 @@ import '../models/exam_model.dart';
 import 'login_page.dart';
 import 'groups_page.dart';
 import 'all_students_page.dart';
+import 'teacher/teacher_settings_page.dart';
+import 'teacher/teacher_schedule_page.dart';
+import 'teacher/teacher_send_remark_page.dart';
+import 'teacher/teacher_announcements_page.dart';
+import 'teacher/teacher_profile_page.dart';
 
 class TeacherPage extends StatefulWidget {
   @override
@@ -160,48 +165,55 @@ class _TeacherPageState extends State<TeacherPage> {
                   title: 'جدول الأوقات',
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('صفحة الجدول قيد التطوير')),
-                    );
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => TeacherSchedulePage()
+                    ));
                   },
                 ),
-                
+
                 _buildDrawerItem(
                   icon: Icons.feedback,
                   title: 'إرسال ملاحظة',
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('صفحة الملاحظات قيد التطوير')),
-                    );
-                  },
-                ),
-                
-                _buildDrawerItem(
-                  icon: Icons.notifications,
-                  title: 'الإشعارات',
-                  badge: _buildNotificationsBadge(),
-                  onTap: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('صفحة الإشعارات قيد التطوير')),
-                    );
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => TeacherSendRemarkPage()
+                    ));
                   },
                 ),
 
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text('الحساب', style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.bold)),
+                _buildDrawerItem(
+                  icon: Icons.campaign,
+                  title: 'الإعلانات',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => TeacherAnnouncementsPage()
+                    ));
+                  },
                 ),
-                
+
+                // ... Dans la section "الحساب":
+
                 _buildDrawerItem(
                   icon: Icons.person,
                   title: 'الملف الشخصي',
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('صفحة الملف الشخصي قيد التطوير')),
-                    );
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => TeacherProfilePage()
+                    ));
+                  },
+                ),
+
+                _buildDrawerItem(
+                  icon: Icons.settings,
+                  title: 'الإعدادات',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => TeacherSettingsPage()
+                    ));
                   },
                 ),
               ],
