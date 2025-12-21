@@ -1,24 +1,25 @@
-// lib/screens/all_students_page.dart
+// lib/screens/all_students_page.dart - VERSION AVEC GROUPID
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'follow_student_page.dart';
 
 class AllStudentsPage extends StatelessWidget {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Color(0xFFF6F3EE),
         appBar: AppBar(
           title: Text("قائمة التلاميذ"),
           backgroundColor: Color(0xFF4F6F52),
-          elevation: 0,
         ),
         body: StreamBuilder<QuerySnapshot>(
+          // ✅ Récupère les étudiants depuis Firestore
           stream: _firestore
               .collection('users')
               .where('role', isEqualTo: 'etudiant')
@@ -28,21 +29,7 @@ class AllStudentsPage extends StatelessWidget {
           builder: (context, snapshot) {
             // Chargement
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      color: Color(0xFF4F6F52),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'جاري تحميل قائمة الطلاب...',
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                  ],
-                ),
-              );
+              return Center(child: CircularProgressIndicator());
             }
 
             // Erreur
@@ -51,18 +38,9 @@ class AllStudentsPage extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 60, color: Colors.red),
+                    Icon(Icons.error, size: 60, color: Colors.red),
                     SizedBox(height: 16),
-                    Text(
-                      'حدث خطأ في تحميل البيانات',
-                      style: TextStyle(fontSize: 18, color: Colors.red),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      snapshot.error.toString(),
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
+                    Text('حدث خطأ في تحميل البيانات'),
                   ],
                 ),
               );
@@ -85,383 +63,165 @@ class AllStudentsPage extends StatelessWidget {
               );
             }
 
-            // Données disponibles
+            // ✅ Données disponibles
             List<QueryDocumentSnapshot> students = snapshot.data!.docs;
 
-            return Column(
-              children: [
-                // En-tête avec statistiques
-                Container(
-                  padding: EdgeInsets.all(20),
-                  margin: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0xFF4F6F52).withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.people, color: Colors.white, size: 32),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'إجمالي الطلاب',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              '${students.length} طالب',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 20),
-                    ],
-                  ),
-                ),
+            return Padding(
+              padding: EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: [
+                    DataColumn(label: Text("رقم")),
+                    DataColumn(label: Text("الاسم")),
+                    DataColumn(label: Text("اللقب")),
+                    DataColumn(label: Text("المجموعة")), // ✅ AJOUTÉ
+                    DataColumn(label: Text("العمر")),
+                    DataColumn(label: Text("الهاتف")),
+                    DataColumn(label: Text("البريد")),
+                    DataColumn(label: Text("تاريخ الانضمام")),
+                    DataColumn(label: Text("الحفظ الحالي")),
+                  ],
+                  rows: List.generate(
+                    students.length,
+                    (index) {
+                      // ✅ Récupère le document et les données
+                      var doc = students[index];
+                      var data = doc.data() as Map<String, dynamic>;
+                      
+                      // ✅ L'ID Firebase (UID) est dans doc.id
+                      String studentId = doc.id;
+                      
+                      // Données de l'étudiant
+                      String firstName = data['firstName'] ?? '';
+                      String lastName = data['lastName'] ?? '';
+                      String groupId = data['groupId'] ?? ''; // ✅ RÉCUPÉRÉ
+                      int age = data['age'] ?? 0;
+                      String phone = data['phone'] ?? '';
+                      String email = data['email'] ?? '';
+                      
+                      // Date d'inscription
+                      String dateInscription = '';
+                      if (data['dateInscription'] != null) {
+                        Timestamp timestamp = data['dateInscription'];
+                        DateTime date = timestamp.toDate();
+                        dateInscription = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                      }
+                      
+                      // Calcul du hafd total
+                      int oldHafd = data['oldHafd'] ?? 0;
+                      int newHafd = data['newHafd'] ?? 0;
+                      int totalHafd = oldHafd + newHafd;
 
-                // Tableau des étudiants
-                Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      child: Container(
-                        margin: EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 15,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              headingRowColor: MaterialStateProperty.all(
-                                Color(0xFF4F6F52).withOpacity(0.1),
-                              ),
-                              headingRowHeight: 56,
-                              dataRowHeight: 64,
-                              columnSpacing: 20,
-                              horizontalMargin: 20,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[200]!),
-                              ),
-                              columns: [
-                                DataColumn(
-                                  label: Text(
-                                    "رقم",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "الاسم",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "اللقب",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "العمر",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "الهاتف",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "البريد",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "تاريخ الانضمام",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    "الحفظ الحالي",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF4F6F52),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              rows: List.generate(
-                                students.length,
-                                (index) {
-                                  var doc = students[index];
-                                  var data = doc.data() as Map<String, dynamic>;
-                                  
-                                  String studentId = doc.id;
-                                  String firstName = data['firstName'] ?? '';
-                                  String lastName = data['lastName'] ?? '';
-                                  int age = data['age'] ?? 0;
-                                  String phone = data['phone'] ?? '';
-                                  String email = data['email'] ?? '';
-                                  
-                                  String dateInscription = '';
-                                  if (data['dateInscription'] != null) {
-                                    Timestamp timestamp = data['dateInscription'];
-                                    DateTime date = timestamp.toDate();
-                                    dateInscription = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                                  }
-                                  
-                                  int oldHafd = data['oldHafd'] ?? 0;
-                                  int newHafd = data['newHafd'] ?? 0;
-                                  int totalHafd = oldHafd + newHafd;
-
-                                  return DataRow(
-                                    color: MaterialStateProperty.resolveWith<Color?>(
-                                      (Set<MaterialState> states) {
-                                        if (states.contains(MaterialState.hovered)) {
-                                          return Color(0xFF4F6F52).withOpacity(0.05);
-                                        }
-                                        return index % 2 == 0
-                                            ? Colors.grey[50]
-                                            : Colors.white;
-                                      },
-                                    ),
-                                    cells: [
-                                      DataCell(
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          child: Text(
-                                            (index + 1).toString(),
-                                            style: TextStyle(fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                      
-                                      // Cellule du prénom - CLIQUABLE
-                                      DataCell(
-                                        InkWell(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => FollowStudentPage(
-                                                  studentId: studentId,
-                                                  firstName: firstName,
-                                                  lastName: lastName,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.all(8),
-                                            child: Row(
-                                              children: [
-                                                Text(
-                                                  firstName,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF4F6F52),
-                                                    decoration: TextDecoration.underline,
-                                                  ),
-                                                ),
-                                                SizedBox(width: 4),
-                                                Icon(
-                                                  Icons.open_in_new,
-                                                  size: 14,
-                                                  color: Color(0xFF4F6F52),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      
-                                      // Cellule du nom - CLIQUABLE
-                                      DataCell(
-                                        InkWell(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => FollowStudentPage(
-                                                  studentId: studentId,
-                                                  firstName: firstName,
-                                                  lastName: lastName,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.all(8),
-                                            child: Row(
-                                              children: [
-                                                Text(
-                                                  lastName,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF4F6F52),
-                                                    decoration: TextDecoration.underline,
-                                                  ),
-                                                ),
-                                                SizedBox(width: 4),
-                                                Icon(
-                                                  Icons.open_in_new,
-                                                  size: 14,
-                                                  color: Color(0xFF4F6F52),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      
-                                      DataCell(
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          child: Text(
-                                            age.toString(),
-                                            style: TextStyle(fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          child: Text(
-                                            phone,
-                                            style: TextStyle(fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          child: Text(
-                                            email,
-                                            style: TextStyle(fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          child: Text(
-                                            dateInscription,
-                                            style: TextStyle(fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                      DataCell(
-                                        Container(
-                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: totalHafd >= 60
-                                                ? Colors.green.withOpacity(0.2)
-                                                : Colors.blue.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Text(
-                                            '${totalHafd.clamp(0, 60)}/60',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: totalHafd >= 60
-                                                  ? Colors.green[900]
-                                                  : Colors.blue[900],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
+                      return DataRow(
+                        cells: [
+                          DataCell(Text((index + 1).toString())),
+                          
+                          // ✅ Cellule du prénom - CLIQUABLE
+                          DataCell(
+                            Text(firstName),
+                            onTap: () => _navigateToFollowPage(
+                              context,
+                              studentId,
+                              groupId,
+                              firstName,
+                              lastName,
                             ),
                           ),
-                        ),
-                      ),
-                    ),
+                          
+                          // ✅ Cellule du nom - CLIQUABLE
+                          DataCell(
+                            Text(lastName),
+                            onTap: () => _navigateToFollowPage(
+                              context,
+                              studentId,
+                              groupId,
+                              firstName,
+                              lastName,
+                            ),
+                          ),
+                          
+                          // ✅ Nom du groupe (async)
+                          DataCell(
+                            FutureBuilder<String>(
+                              future: _getGroupName(groupId),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData) {
+                                  return Text(snapshot.data ?? '-');
+                                }
+                                return Text('-');
+                              },
+                            ),
+                          ),
+                          
+                          DataCell(Text(age.toString())),
+                          DataCell(Text(phone)),
+                          DataCell(Text(email)),
+                          DataCell(Text(dateInscription)),
+                          DataCell(Text(totalHafd.clamp(0, 60).toString())),
+                        ],
+                      );
+                    },
                   ),
                 ),
-                SizedBox(height: 16),
-              ],
+              ),
             );
           },
         ),
       ),
     );
+  }
+
+  // ✅ Fonction pour naviguer vers FollowStudentPage
+  void _navigateToFollowPage(
+    BuildContext context,
+    String studentId,
+    String groupId,
+    String firstName,
+    String lastName,
+  ) {
+    // Vérifier si l'étudiant a un groupe
+    if (groupId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('هذا الطالب غير مسجل في أي مجموعة'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FollowStudentPage(
+          groupId: groupId,      // ✅ PASSÉ
+          studentId: studentId,
+          firstName: firstName,
+          lastName: lastName,
+        ),
+      ),
+    );
+  }
+
+  // ✅ Fonction pour récupérer le nom du groupe
+  Future<String> _getGroupName(String groupId) async {
+    if (groupId.isEmpty) return '-';
+    
+    try {
+      DocumentSnapshot groupDoc = await _firestore
+          .collection('groups')
+          .doc(groupId)
+          .get();
+      
+      if (groupDoc.exists) {
+        Map<String, dynamic> data = groupDoc.data() as Map<String, dynamic>;
+        return data['name'] ?? '-';
+      }
+    } catch (e) {
+      print('Erreur récupération groupe: $e');
+    }
+    
+    return '-';
   }
 }

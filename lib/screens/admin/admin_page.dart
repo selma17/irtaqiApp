@@ -12,6 +12,7 @@ import 'send_announcement_page.dart'; // ✅ ANNONCES
 import 'view_remarks_page.dart'; // ✅ REMARQUES
 import '../../services/activity_service.dart';
 import '../../services/stats_service.dart';
+import 'manage_attendance_page.dart';
 
 
 class AdminPage extends StatefulWidget {
@@ -1039,7 +1040,19 @@ class _AdminPageState extends State<AdminPage> {
                     );
                   },
                 ),
-                
+                _buildDrawerItem(
+                  icon: Icons.assignment,
+                  title: 'إدارة فيش الحضور',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ManageAttendancePage(),
+                      ),
+                    );
+                  },
+                ),
                 _buildDrawerItem(
                   icon: Icons.schedule,
                   title: 'جدول الأوقات',

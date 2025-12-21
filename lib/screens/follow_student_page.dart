@@ -1,17 +1,19 @@
-// lib/screens/follow_student_page.dart - VERSION CORRIGÉE AVEC CHARGEMENT
+// lib/screens/teacher/follow_student_page.dart - VERSION AVEC SYNCHRONISATION ADMIN
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FollowStudentPage extends StatefulWidget {
-  final String studentId;  // ✅ UID Firebase de l'étudiant
+  final String groupId;     // ✅ ID du groupe
+  final String studentId;   // ✅ UID Firebase de l'étudiant
   final String firstName;
   final String lastName;
 
   const FollowStudentPage({
     super.key,
-    required this.studentId,  // ✅ AJOUTÉ
+    required this.groupId,    // ✅ AJOUTÉ pour sync admin
+    required this.studentId,
     required this.firstName,
     required this.lastName,
   });
@@ -22,13 +24,16 @@ class FollowStudentPage extends StatefulWidget {
 
 class _FollowStudentPageState extends State<FollowStudentPage> {
   final List<Map<String, dynamic>> weeklyRecords = [];
-  bool isLoading = true; // ✅ AJOUTÉ : Indicateur de chargement
+  bool isLoading = true;
+  String groupName = '';
   
   final Map<String, int> suras = {
     "الفاتحة": 7,
     "البقرة": 286,
     "آل عمران": 200,
     "النساء": 176,
+    "المائدة": 120,
+    "الأنعام": 165,
   };
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -37,50 +42,98 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
   @override
   void initState() {
     super.initState();
-    _loadExistingRecords();  // ✅ Charger les fiches existantes
+    _loadGroupInfo();
+    _loadExistingRecords();
   }
 
-  // ✅ CORRIGÉ: Charger les fiches avec indicateur de chargement
+  // ✅ Charger les infos du groupe
+  Future<void> _loadGroupInfo() async {
+    try {
+      DocumentSnapshot groupDoc = await _firestore
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+      
+      if (groupDoc.exists) {
+        Map<String, dynamic> data = groupDoc.data() as Map<String, dynamic>;
+        setState(() {
+          groupName = data['name'] ?? 'مجموعة';
+        });
+      }
+    } catch (e) {
+      print('Erreur chargement groupe: $e');
+    }
+  }
+
+  // ✅ Charger les fiches existantes depuis attendance
   Future<void> _loadExistingRecords() async {
     setState(() {
-      isLoading = true; // Début du chargement
+      isLoading = true;
     });
     
     try {
+      // ✅ CORRIGÉ: Requête simplifiée sans orderBy pour éviter erreur d'index
       QuerySnapshot snapshot = await _firestore
-          .collection('students_follow_up')
-          .doc(widget.studentId)  // ✅ Utilise l'UID
-          .collection('weekly_records')
-          .orderBy('date', descending: true)
+          .collection('attendance')
+          .where('groupId', isEqualTo: widget.groupId)
+          .where('profId', isEqualTo: _auth.currentUser?.uid)
           .get();
 
       setState(() {
-        weeklyRecords.clear(); // Vider d'abord
+        weeklyRecords.clear();
+        
+        // ✅ Liste temporaire pour trier
+        List<Map<String, dynamic>> tempRecords = [];
+        
         for (var doc in snapshot.docs) {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          weeklyRecords.add({
-            "docId": doc.id,  // Pour pouvoir éditer/supprimer
-            "date": (data['date'] as Timestamp).toDate(),
-            "sura": data['sura'],
-            "verseFrom": List<int>.from(data['verseFrom']),
-            "verseTo": List<int>.from(data['verseTo']),
-            "revision": List<String>.from(data['revision']),
-            "notes": data['notes'],
-            "isSaved": true,  // Déjà sauvegardé
+          Map<String, dynamic> weeklyData = data['weeklyRecords'] ?? {};
+          
+          // Pour chaque semaine dans le document
+          weeklyData.forEach((weekKey, weekValue) {
+            if (weekValue is Map && weekValue.containsKey('students')) {
+              Map<String, dynamic> students = weekValue['students'];
+              
+              // Vérifier si cet étudiant est dans cette semaine
+              if (students.containsKey(widget.studentId)) {
+                Map<String, dynamic> studentData = students[widget.studentId];
+                
+                // Reconstruire le format attendu
+                tempRecords.add({
+                  "docId": doc.id,
+                  "weekKey": weekKey,
+                  "month": data['month'],
+                  "date": (studentData['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                  "sura": studentData['sura'] ?? suras.keys.first,
+                  "verseFrom": List<int>.from(studentData['verseFrom'] ?? List.filled(7, 1)),
+                  "verseTo": List<int>.from(studentData['verseTo'] ?? List.filled(7, 1)),
+                  "revision": List<String>.from(studentData['revision'] ?? List.filled(7, "")),
+                  "notes": studentData['notes'] ?? "",
+                  "isSaved": true,
+                });
+              }
+            }
           });
         }
-        isLoading = false; // Fin du chargement
+        
+        // ✅ Trier par date décroissante EN MÉMOIRE
+        tempRecords.sort((a, b) => (b["date"] as DateTime).compareTo(a["date"] as DateTime));
+        
+        // Ajouter à la liste finale
+        weeklyRecords.addAll(tempRecords);
+        
+        isLoading = false;
       });
     } catch (e) {
       print('Erreur chargement fiches: $e');
       setState(() {
-        isLoading = false; // Fin du chargement même en cas d'erreur
+        isLoading = false;
       });
     }
   }
 
   void _addEmptyWeek() {
-    weeklyRecords.insert(0, {  // Insérer au début
+    weeklyRecords.insert(0, {
       "date": DateTime.now(),
       "sura": suras.keys.first,
       "verseFrom": List.filled(7, 1),
@@ -103,8 +156,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
           backgroundColor: Color(0xFF4F6F52),
         ),
         body: isLoading
-            ? // ✅ AFFICHER LOADING pendant le chargement
-              Center(
+            ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -120,8 +172,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
                 ),
               )
             : weeklyRecords.isEmpty
-                ? // ✅ AFFICHER MESSAGE si aucune fiche après chargement
-                  Center(
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -149,8 +200,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
                       ],
                     ),
                   )
-                : // ✅ AFFICHER LES FICHES si elles existent
-                  SingleChildScrollView(
+                : SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
@@ -166,18 +216,20 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
                             ElevatedButton(
                               onPressed: _addEmptyWeek,
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF4F6F52),
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
+                                backgroundColor: Color(0xFF4F6F52),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              ),
                               child: Text("إضافة صفحة متابعة جديدة"),
                             ),
                             const SizedBox(width: 20),
                             ElevatedButton(
                               onPressed: _showTestForm,
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF4F6F52),
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
+                                backgroundColor: Color(0xFF4F6F52),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              ),
                               child: Text("تخطيط اختبار"),
                             ),
                           ],
@@ -192,7 +244,8 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
 
   Widget _buildWeekTable(int weekIndex, Map<String, dynamic> week) {
     bool isSaved = week["isSaved"] ?? false;
-    String? docId = week["docId"];  // ID du document Firestore si déjà sauvegardé
+    String? docId = week["docId"];
+    String? weekKey = week["weekKey"];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 25),
@@ -249,58 +302,14 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
               // ✅ SAVE BUTTON
               if (!isSaved)
                 InkWell(
-                  onTap: () async {
-                    try {
-                      setState(() {
-                        week["isSaved"] = true;
-                      });
-
-                      // ✅ CORRIGÉ: Utilise l'UID
-                      CollectionReference students = FirebaseFirestore.instance.collection('students_follow_up');
-                      DocumentReference studentDoc = students.doc(widget.studentId);
-
-                      // Ajouter le record de la semaine
-                      DocumentReference newDoc = await studentDoc.collection('weekly_records').add({
-                        'date': week["date"],
-                        'sura': week["sura"],
-                        'verseFrom': week["verseFrom"],
-                        'verseTo': week["verseTo"],
-                        'revision': week["revision"],
-                        'notes': week["notes"],
-                        'createdAt': FieldValue.serverTimestamp(),
-                      });
-
-                      // Sauvegarder l'ID du document
-                      setState(() {
-                        week["docId"] = newDoc.id;
-                      });
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("تم حفظ الصفحة بنجاح ✓"),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    } catch (e) {
-                      setState(() {
-                        week["isSaved"] = false;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("حدث خطأ أثناء الحفظ: $e"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _saveWeeklyRecord(weekIndex, week),
                   child: _roundedIcon(Icons.check, Colors.green),
                 ),
 
               // ✅ EDIT BUTTON
               if (isSaved)
                 InkWell(
-                  onTap: () async {
-                    // Permettre l'édition
+                  onTap: () {
                     setState(() {
                       week["isSaved"] = false;
                     });
@@ -312,47 +321,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
 
               // ❌ DELETE BUTTON
               InkWell(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text("تأكيد الحذف"),
-                      content: Text("هل تريد حذف هذا الجدول؟"),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: Text("إلغاء"),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                          ),
-                          onPressed: () async {
-                            // Si déjà sauvegardé, supprimer de Firestore
-                            if (docId != null) {
-                              try {
-                                await _firestore
-                                    .collection('students_follow_up')
-                                    .doc(widget.studentId)
-                                    .collection('weekly_records')
-                                    .doc(docId)
-                                    .delete();
-                              } catch (e) {
-                                print('Erreur suppression: $e');
-                              }
-                            }
-                            
-                            setState(() {
-                              weeklyRecords.removeAt(weekIndex);
-                            });
-                            Navigator.pop(ctx);
-                          },
-                          child: Text("حذف"),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                onTap: () => _deleteWeeklyRecord(weekIndex, week),
                 child: _roundedIcon(Icons.close, Colors.red),
               ),
             ],
@@ -360,7 +329,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
 
           const SizedBox(height: 10),
 
-          // SURAT
+          // SURAT DROPDOWN
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -404,6 +373,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
             ),
           ),
 
+          // DAYS ROWS
           Column(
             children: List.generate(7, (i) {
               int maxVerse = suras[week["sura"]]!;
@@ -477,6 +447,7 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
 
           const SizedBox(height: 10),
 
+          // NOTES
           TextFormField(
             initialValue: week["notes"],
             enabled: !isSaved,
@@ -489,6 +460,136 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
               filled: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ FONCTION DE SAUVEGARDE AVEC INDEX ADMIN
+  Future<void> _saveWeeklyRecord(int weekIndex, Map<String, dynamic> week) async {
+    try {
+      setState(() {
+        week["isSaved"] = true;
+      });
+
+      DateTime date = week["date"];
+      String month = '${date.year}-${date.month.toString().padLeft(2, '0')}';
+      String weekKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-W${((date.day - 1) ~/ 7) + 1}';
+      
+      String docId = '${widget.groupId}_$month';
+
+      // Préparer les données de l'étudiant pour cette semaine
+      Map<String, dynamic> studentWeekData = {
+        'sura': week["sura"],
+        'verseFrom': week["verseFrom"],
+        'verseTo': week["verseTo"],
+        'revision': week["revision"],
+        'notes': week["notes"],
+        'date': Timestamp.fromDate(week["date"]),
+      };
+
+      // ✅ SAUVEGARDER AVEC CHAMPS INDEX POUR ADMIN
+      await _firestore.collection('attendance').doc(docId).set({
+        // ✅ CHAMPS INDEX POUR FILTRES ADMIN
+        'groupId': widget.groupId,
+        'groupName': groupName,
+        'profId': _auth.currentUser!.uid,
+        'month': month,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+        
+        // Données de présence par semaine
+        'weeklyRecords': {
+          weekKey: {
+            'students': {
+              widget.studentId: studentWeekData,
+            }
+          }
+        }
+      }, SetOptions(merge: true));
+
+      // Sauvegarder les références pour édition/suppression
+      setState(() {
+        week["docId"] = docId;
+        week["weekKey"] = weekKey;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("تم حفظ الصفحة بنجاح ✓"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        week["isSaved"] = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("حدث خطأ أثناء الحفظ: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      print('Erreur sauvegarde: $e');
+    }
+  }
+
+  // ✅ FONCTION DE SUPPRESSION
+  Future<void> _deleteWeeklyRecord(int weekIndex, Map<String, dynamic> week) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("تأكيد الحذف"),
+        content: Text("هل تريد حذف هذا الجدول؟"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              
+              // Si déjà sauvegardé, supprimer de Firestore
+              if (week["isSaved"] == true && week["docId"] != null && week["weekKey"] != null) {
+                try {
+                  String docId = week["docId"];
+                  String weekKey = week["weekKey"];
+                  
+                  // Supprimer l'étudiant de cette semaine
+                  await _firestore.collection('attendance').doc(docId).update({
+                    'weeklyRecords.$weekKey.students.${widget.studentId}': FieldValue.delete(),
+                    'lastUpdated': FieldValue.serverTimestamp(),
+                  });
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("تم حذف الفيشة من قاعدة البيانات"),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                } catch (e) {
+                  print('Erreur suppression Firestore: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("حدث خطأ أثناء الحذف: $e"),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+              
+              // Supprimer de la liste locale
+              setState(() {
+                weeklyRecords.removeAt(weekIndex);
+              });
+            },
+            child: Text("حذف"),
           ),
         ],
       ),
@@ -510,7 +611,6 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
   }
 
   void _showTestForm() {
-    // TODO: Implémenter le formulaire de test
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("تخطيط الاختبار - قريباً")),
     );
