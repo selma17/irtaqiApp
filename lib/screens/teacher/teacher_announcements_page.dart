@@ -1,8 +1,10 @@
 // lib/screens/teacher/teacher_announcements_page.dart
+// ✅ VERSION CORRIGÉE - Ajout ouverture détails d'annonce
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../common/announcement_detail_page.dart';
 
 class TeacherAnnouncementsPage extends StatefulWidget {
   @override
@@ -177,7 +179,7 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
                 Icon(Icons.campaign_outlined, size: 80, color: Colors.grey),
                 SizedBox(height: 16),
                 Text(
-                  'لا توجد إعلانات حالياً',
+                  'لا توجد إعلانات حاليًا',
                   style: TextStyle(fontSize: 18, color: Colors.grey),
                 ),
               ],
@@ -185,10 +187,8 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
           );
         }
 
-        // Filtrer les annonces selon le filtre sélectionné
         List<DocumentSnapshot> announcements = snapshot.data!.docs;
         
-        // Récupérer les annonces lues par le professeur
         return FutureBuilder<DocumentSnapshot>(
           future: _firestore
               .collection('users')
@@ -251,12 +251,24 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
 
   Widget _buildAnnouncementCard(String announcementId, Map<String, dynamic> data, bool isRead) {
     String title = data['title'] ?? 'إعلان';
-    String message = data['message'] ?? '';
+    String message = data['message'] ?? data['content'] ?? '';
     Timestamp? timestamp = data['createdAt'];
     DateTime createdAt = timestamp?.toDate() ?? DateTime.now();
 
     return InkWell(
-      onTap: () => _markAsRead(announcementId),
+      // ✅ AJOUTÉ : Ouverture de la page de détails
+      onTap: () {
+        _markAsRead(announcementId);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AnnouncementDetailPage(
+              announcementId: announcementId,
+              announcementData: data,
+            ),
+          ),
+        );
+      },
       child: Container(
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -300,20 +312,22 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
                   ),
                 ),
                 Icon(
-                  Icons.campaign,
-                  size: 20,
-                  color: isRead ? Colors.grey[400] : Color(0xFF4F6F52),
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey[400],
                 ),
               ],
             ),
             SizedBox(height: 8),
             Text(
-              message,
+              message.length > 100 ? message.substring(0, 100) + '...' : message,
               style: TextStyle(
                 fontSize: 14,
                 height: 1.5,
                 color: Colors.grey[700],
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             SizedBox(height: 12),
             Row(

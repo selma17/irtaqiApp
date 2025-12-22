@@ -1,7 +1,9 @@
 // lib/screens/admin/send_announcement_page.dart
+// ✅ VERSION FINALE CORRIGÉE - Image s'affiche instantanément sur web
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -26,9 +28,8 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
   List<Map<String, dynamic>> _groups = [];
   bool _isLoading = false;
   
-  // ✅ NOUVEAU : Pour gérer l'image
-  File? _selectedImage;
-  //String? _uploadedImageUrl;
+  // ✅ dynamic pour supporter web (XFile) et mobile (File)
+  dynamic _selectedImage;
 
   @override
   void initState() {
@@ -55,7 +56,6 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
     super.dispose();
   }
 
-  // ✅ NOUVEAU : Sélectionner une image
   Future<void> _pickImage() async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -66,11 +66,18 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
       );
       
       if (image != null) {
+        print('✅ Image sélectionnée: ${image.path}');
         setState(() {
-          _selectedImage = File(image.path);
+          if (kIsWeb) {
+            _selectedImage = image;  // Garder XFile sur web
+          } else {
+            _selectedImage = File(image.path);  // Convertir en File sur mobile
+          }
         });
+        print('✅ _selectedImage défini: ${_selectedImage != null}');
       }
     } catch (e) {
+      print('❌ Erreur sélection: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ خطأ في اختيار الصورة: $e'),
@@ -80,7 +87,6 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
     }
   }
 
-  // ✅ NOUVEAU : Upload image vers Firebase Storage
   Future<String?> _uploadImage() async {
     if (_selectedImage == null) return null;
 
@@ -88,46 +94,55 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
       String fileName = 'announcements/${DateTime.now().millisecondsSinceEpoch}.jpg';
       Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
       
-      UploadTask uploadTask = storageRef.putFile(_selectedImage!);
-      TaskSnapshot snapshot = await uploadTask;
+      UploadTask uploadTask;
       
+      if (kIsWeb) {
+        // Sur web : upload bytes
+        final bytes = await (_selectedImage as XFile).readAsBytes();
+        uploadTask = storageRef.putData(bytes);
+      } else {
+        // Sur mobile : upload file
+        uploadTask = storageRef.putFile(_selectedImage as File);
+      }
+      
+      TaskSnapshot snapshot = await uploadTask;
       String downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      print('✅ Image uploadée: $downloadUrl');
       return downloadUrl;
     } catch (e) {
-      print('Erreur upload image: $e');
+      print('❌ Erreur upload image: $e');
       return null;
     }
   }
 
   Future<void> _sendAnnouncement() async {
-    // ✅ VALIDATION AMÉLIORÉE
+    // Validation
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚠️ العنوان مطلوب'),
-          backgroundColor: Colors.orange,
+          content: Text('❌ يرجى إدخال عنوان الإعلان'),
+          backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    // Si pas d'image, le contenu est obligatoire
     if (_selectedImage == null && _contentController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚠️ يجب إدخال محتوى أو إضافة صورة'),
-          backgroundColor: Colors.orange,
+          content: Text('❌ يرجى إدخال محتوى الإعلان أو اختيار صورة'),
+          backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    // Validation du groupe spécifique
-    if (_targetAudience == 'specific_group' && _selectedGroupId == null) {
+    if (_targetAudience == 'group' && _selectedGroupId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚠️ الرجاء اختيار مجموعة'),
-          backgroundColor: Colors.orange,
+          content: Text('❌ يرجى اختيار المجموعة'),
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -135,56 +150,57 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
 
     setState(() => _isLoading = true);
 
-    // Upload de l'image si présente
-    String? imageUrl;
-    if (_selectedImage != null) {
-      imageUrl = await _uploadImage();
-      if (imageUrl == null) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ فشل رفع الصورة'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+    try {
+      // Upload image si existe
+      String? imageUrl;
+      if (_selectedImage != null) {
+        imageUrl = await _uploadImage();
+        if (imageUrl == null) {
+          throw Exception('فشل رفع الصورة');
+        }
       }
-    }
 
-    bool success = await _announcementService.createAnnouncement(
-      title: _titleController.text.trim(),
-      content: _contentController.text.trim(),
-      targetAudience: _targetAudience,
-      targetGroupId: _targetAudience == 'specific_group' ? _selectedGroupId : null,
-      imageUrl: imageUrl,
-    );
+      // Préparer les données
+      Map<String, dynamic> announcementData = {
+        'title': _titleController.text.trim(),
+        'content': _contentController.text.trim(),
+        'imageUrl': imageUrl,
+        'targetAudience': _targetAudience,
+        'groupId': _selectedGroupId,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
 
-    setState(() => _isLoading = false);
+      // Envoyer l'annonce
+      await _firestore.collection('announcements').add(announcementData);
 
-    if (success) {
+      // Succès
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('✅ تم إرسال الإعلان بنجاح'),
           backgroundColor: Colors.green,
         ),
       );
-      
-      // Clear form
+
+      // Reset
       _titleController.clear();
       _contentController.clear();
       setState(() {
+        _selectedImage = null;
         _targetAudience = 'all';
         _selectedGroupId = null;
-        _selectedImage = null;
-        //_uploadedImageUrl = null;
       });
-    } else {
+
+      Navigator.pop(context);
+    } catch (e) {
+      print('Erreur envoi annonce: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ حدث خطأ أثناء الإرسال'),
+          content: Text('❌ حدث خطأ أثناء الإرسال: $e'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -265,7 +281,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Titre (OBLIGATOIRE)
+                      // Titre
                       Text(
                         'العنوان *',
                         style: TextStyle(
@@ -295,7 +311,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                       ),
                       SizedBox(height: 20),
 
-                      // Contenu (CONDITIONNEL)
+                      // Contenu
                       Row(
                         children: [
                           Text(
@@ -346,7 +362,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                       ),
                       SizedBox(height: 20),
 
-                      // ✅ NOUVEAU : Section Image
+                      // ✅ Section Image CORRIGÉE
                       Text(
                         'الصورة (اختياري)',
                         style: TextStyle(
@@ -357,6 +373,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                       ),
                       SizedBox(height: 8),
                       
+                      // ✅ AFFICHAGE IMAGE CORRIGÉ - INSTANTANÉ SUR WEB
                       if (_selectedImage != null) ...[
                         Stack(
                           children: [
@@ -365,10 +382,44 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                               height: 200,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
-                                image: DecorationImage(
-                                  image: FileImage(_selectedImage!),
-                                  fit: BoxFit.cover,
-                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: kIsWeb
+                                    // ✅ WEB : Image.network avec blob URL (INSTANTANÉ)
+                                    ? Image.network(
+                                        (_selectedImage as XFile).path,  // blob:http://...
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: 200,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Center(child: CircularProgressIndicator());
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          print('❌ Erreur affichage web: $error');
+                                          return Container(
+                                            color: Colors.grey[200],
+                                            child: Center(
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.image, size: 60, color: Colors.grey),
+                                                  SizedBox(height: 8),
+                                                  Text('Image sélectionnée', style: TextStyle(color: Colors.grey)),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    // ✅ MOBILE : Image.file
+                                    : Image.file(
+                                        _selectedImage as File,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: 200,
+                                      ),
                               ),
                             ),
                             Positioned(
@@ -429,14 +480,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                         },
                         title: Text('الجميع (أساتذة + طلاب)'),
                         activeColor: Color(0xFF4F6F52),
-                        tileColor: _targetAudience == 'all'
-                            ? Color(0xFF4F6F52).withOpacity(0.1)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
                       ),
-                      SizedBox(height: 8),
 
                       RadioListTile<String>(
                         value: 'teachers',
@@ -449,14 +493,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                         },
                         title: Text('الأساتذة فقط'),
                         activeColor: Color(0xFF4F6F52),
-                        tileColor: _targetAudience == 'teachers'
-                            ? Color(0xFF4F6F52).withOpacity(0.1)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
                       ),
-                      SizedBox(height: 8),
 
                       RadioListTile<String>(
                         value: 'students',
@@ -469,49 +506,31 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                         },
                         title: Text('الطلاب فقط'),
                         activeColor: Color(0xFF4F6F52),
-                        tileColor: _targetAudience == 'students'
-                            ? Color(0xFF4F6F52).withOpacity(0.1)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
                       ),
-                      SizedBox(height: 8),
 
                       RadioListTile<String>(
-                        value: 'specific_group',
+                        value: 'group',
                         groupValue: _targetAudience,
                         onChanged: (value) {
                           setState(() {
                             _targetAudience = value!;
                           });
                         },
-                        title: Text('مجموعة محددة (الأستاذ + الطلاب)'),
+                        title: Text('مجموعة محددة'),
                         activeColor: Color(0xFF4F6F52),
-                        tileColor: _targetAudience == 'specific_group'
-                            ? Color(0xFF4F6F52).withOpacity(0.1)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
                       ),
 
-                      if (_targetAudience == 'specific_group') ...[
+                      if (_targetAudience == 'group') ...[
                         SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           value: _selectedGroupId,
                           decoration: InputDecoration(
-                            labelText: 'اختر المجموعة',
-                            prefixIcon: Icon(Icons.groups, color: Color(0xFF4F6F52)),
+                            hintText: 'اختر المجموعة',
                             filled: true,
                             fillColor: Color(0xFFF6F3EE),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Color(0xFF4F6F52), width: 2),
                             ),
                           ),
                           items: _groups.map((group) {
@@ -530,37 +549,38 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                     ],
                   ),
                 ),
-
+                
                 SizedBox(height: 24),
 
                 // Bouton Envoyer
                 SizedBox(
                   width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton.icon(
+                  height: 50,
+                  child: ElevatedButton(
                     onPressed: _isLoading ? null : _sendAnnouncement,
-                    icon: _isLoading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Icon(Icons.send),
-                    label: Text(
-                      _isLoading ? 'جاري الإرسال...' : 'إرسال الإعلان',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF4F6F52),
-                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 2,
                     ),
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'إرسال الإعلان',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ],

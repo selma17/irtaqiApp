@@ -24,50 +24,6 @@ class _AdminPageState extends State<AdminPage> {
   final AuthService _authService = AuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  int totalStudents = 0;
-  int totalTeachers = 0;
-  int totalGroups = 0;
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStats();
-  }
-
-  Future<void> _loadStats() async {
-    try {
-      // ✅ CORRECTION: Compter seulement les utilisateurs actifs
-      final studentsSnapshot = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: 'etudiant')
-          .where('isActive', isEqualTo: true)  // ← AJOUT ICI
-          .get();
-      
-      final teachersSnapshot = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: 'prof')
-          .where('isActive', isEqualTo: true)  // ← AJOUT ICI
-          .get();
-      
-      final groupsSnapshot = await _firestore
-          .collection('groups')
-          .get();
-
-      setState(() {
-        totalStudents = studentsSnapshot.docs.length;
-        totalTeachers = teachersSnapshot.docs.length;
-        totalGroups = groupsSnapshot.docs.length;
-        isLoading = false;
-      });
-      
-      print('✅ Stats: $totalStudents étudiants, $totalTeachers profs, $totalGroups groupes');
-    } catch (e) {
-      print('❌ Erreur stats: $e');
-      setState(() => isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -88,29 +44,24 @@ class _AdminPageState extends State<AdminPage> {
           ],
         ),
         drawer: _buildDrawer(),
-        body: isLoading
-            ? Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadStats,
-                child: SingleChildScrollView(
-                  physics: AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      SizedBox(height: 20),
-                      _buildStatsCards(),
-                      SizedBox(height: 25),
-                      _buildProgressChart(),
-                      SizedBox(height: 25),
-                      _buildRecentActivities(),
-                      SizedBox(height: 25),
-                      _buildRemarks(),
-                    ],
-                  ),
-                ),
-              ),
+        body: SingleChildScrollView(  // ✅ Plus de "isLoading" ni "RefreshIndicator"
+          physics: AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              SizedBox(height: 20),
+              _buildStatsCards(),  // ✅ StreamBuilder gérera tout
+              SizedBox(height: 25),
+              _buildProgressChart(),
+              SizedBox(height: 25),
+              _buildRecentActivities(),
+              SizedBox(height: 25),
+              _buildRemarks(),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -195,56 +146,90 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  // ✅ CORRECTION 1: Cards responsive (web 4 colonnes, mobile 2 colonnes)
   Widget _buildStatsCards() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Responsive: Web (4 colonnes) vs Mobile (2 colonnes)
-        bool isWeb = constraints.maxWidth > 600;
-        int crossAxisCount = isWeb ? 4 : 2;
-        double aspectRatio = isWeb ? 1.3 : 1.1;
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: aspectRatio,
-          children: [
-            _buildStatCard(
-              title: 'الطلاب',
-              count: totalStudents,
-              icon: Icons.school,
-              color: Color(0xFF4F6F52),
-              gradient: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-            ),
-            _buildStatCard(
-              title: 'الأساتذة',
-              count: totalTeachers,
-              icon: Icons.person,
-              color: Color(0xFF2D5F3F),
-              gradient: [Color(0xFF2D5F3F), Color(0xFF4F6F52)],
-            ),
-            _buildStatCard(
-              title: 'المجموعات',
-              count: totalGroups,
-              icon: Icons.groups,
-              color: Color(0xFF739072),
-              gradient: [Color(0xFF739072), Color(0xFF86A789)],
-            ),
-            _buildStatCard(
-              title: 'الامتحانات',
-              count: 0,
-              icon: Icons.assignment,
-              color: Color(0xFF5F7A61),
-              gradient: [Color(0xFF5F7A61), Color(0xFF739072)],
-            ),
-          ],
+  return StreamBuilder<QuerySnapshot>(  // ✅ Stream en temps réel
+    stream: _firestore.collection('users').snapshots(),
+    builder: (context, userSnapshot) {
+      if (!userSnapshot.hasData) {
+        return Center(
+          child: Padding(
+            padding: EdgeInsets.all(40),
+            child: CircularProgressIndicator(color: Color(0xFF4F6F52)),
+          ),
         );
-      },
-    );
-  }
+      }
+
+      // ✅ Calcul en temps réel
+      int totalStudents = userSnapshot.data!.docs
+          .where((doc) {
+            var data = doc.data() as Map<String, dynamic>;
+            return data['role'] == 'etudiant' && (data['isActive'] ?? true);
+          })
+          .length;
+
+      int totalTeachers = userSnapshot.data!.docs
+          .where((doc) {
+            var data = doc.data() as Map<String, dynamic>;
+            return data['role'] == 'prof' && (data['isActive'] ?? true);
+          })
+          .length;
+
+      return StreamBuilder<QuerySnapshot>(  // ✅ 2ème Stream pour les groupes
+        stream: _firestore.collection('groups').snapshots(),
+        builder: (context, groupSnapshot) {
+          int totalGroups = groupSnapshot.data?.docs.length ?? 0;
+
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              bool isWeb = constraints.maxWidth > 600;
+              int crossAxisCount = isWeb ? 4 : 2;
+              double aspectRatio = isWeb ? 1.3 : 1.1;
+
+              return GridView.count(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: aspectRatio,
+                children: [
+                  _buildStatCard(
+                    title: 'الطلاب',
+                    count: totalStudents,  // ✅ Valeur temps réel
+                    icon: Icons.school,
+                    color: Color(0xFF4F6F52),
+                    gradient: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+                  ),
+                  _buildStatCard(
+                    title: 'الأساتذة',
+                    count: totalTeachers,  // ✅ Valeur temps réel
+                    icon: Icons.person,
+                    color: Color(0xFF2D5F3F),
+                    gradient: [Color(0xFF2D5F3F), Color(0xFF4F6F52)],
+                  ),
+                  _buildStatCard(
+                    title: 'المجموعات',
+                    count: totalGroups,  // ✅ Valeur temps réel
+                    icon: Icons.groups,
+                    color: Color(0xFF739072),
+                    gradient: [Color(0xFF739072), Color(0xFF86A789)],
+                  ),
+                  _buildStatCard(
+                    title: 'الامتحانات',
+                    count: 0,
+                    icon: Icons.assignment,
+                    color: Color(0xFF5F7A61),
+                    gradient: [Color(0xFF5F7A61), Color(0xFF739072)],
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    },
+  );
+}
 
   Widget _buildStatCard({
     required String title,

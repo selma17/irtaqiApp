@@ -1,4 +1,5 @@
 // lib/screens/teacher/teacher_send_remark_page.dart
+// ✅ VERSION CORRIGÉE - Fix du chargement infini des remarques
 
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
@@ -281,7 +282,12 @@ class _TeacherSendRemarkPageState extends State<TeacherSendRemarkPage> {
     );
   }
 
+  // ✅ CORRIGÉ : StreamBuilder direct sur Firestore au lieu du service
   Widget _buildMyRemarksSection() {
+    if (currentUser == null) {
+      return SizedBox.shrink();
+    }
+
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -313,16 +319,51 @@ class _TeacherSendRemarkPageState extends State<TeacherSendRemarkPage> {
             ],
           ),
           SizedBox(height: 16),
-          StreamBuilder<List<RemarkModel>>(
-            stream: _remarkService.getUserRemarksStream(currentUser!.id),
+          
+          // ✅ StreamBuilder CORRIGÉ - Direct sur Firestore
+          StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('remarks')
+                .where('senderId', isEqualTo: currentUser!.id)
+                .orderBy('createdAt', descending: true)
+                .limit(10)
+                .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              // Debug
+              print('🔍 Stream State: ${snapshot.connectionState}');
+              print('🔍 Has Data: ${snapshot.hasData}');
+              print('🔍 Docs Count: ${snapshot.data?.docs.length}');
+              print('🔍 Error: ${snapshot.error}');
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
-                  child: CircularProgressIndicator(color: Color(0xFF4F6F52)),
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(color: Color(0xFF4F6F52)),
+                  ),
                 );
               }
 
-              if (snapshot.data!.isEmpty) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        Icon(Icons.error, size: 60, color: Colors.red),
+                        SizedBox(height: 12),
+                        Text(
+                          'خطأ: ${snapshot.error}',
+                          style: TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                 return Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
@@ -340,14 +381,16 @@ class _TeacherSendRemarkPageState extends State<TeacherSendRemarkPage> {
                 );
               }
 
+              List<DocumentSnapshot> remarks = snapshot.data!.docs;
+
               return ListView.separated(
                 shrinkWrap: true,
                 physics: NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.length,
+                itemCount: remarks.length,
                 separatorBuilder: (context, index) => SizedBox(height: 12),
                 itemBuilder: (context, index) {
-                  RemarkModel remark = snapshot.data![index];
-                  return _buildRemarkCard(remark);
+                  var remarkData = remarks[index].data() as Map<String, dynamic>;
+                  return _buildRemarkCard(remarkData);
                 },
               );
             },
@@ -357,18 +400,17 @@ class _TeacherSendRemarkPageState extends State<TeacherSendRemarkPage> {
     );
   }
 
-  Widget _buildRemarkCard(RemarkModel remark) {
-    Color statusColor = remark.isNew
-        ? Colors.orange
-        : remark.isOpen
-            ? Colors.blue
-            : Colors.green;
+  Widget _buildRemarkCard(Map<String, dynamic> remarkData) {
+    String message = remarkData['message'] ?? '';
+    bool hasResponse = remarkData['adminResponse'] != null && 
+                      remarkData['adminResponse'].toString().isNotEmpty;
+    String? adminResponse = remarkData['adminResponse'];
+    
+    Timestamp? createdAtTimestamp = remarkData['createdAt'];
+    DateTime createdAt = createdAtTimestamp?.toDate() ?? DateTime.now();
 
-    String statusText = remark.isNew
-        ? 'جديدة'
-        : remark.isOpen
-            ? 'قيد المعالجة'
-            : 'مغلقة';
+    Color statusColor = hasResponse ? Colors.green : Colors.orange;
+    String statusText = hasResponse ? 'تم الرد' : 'قيد المعالجة';
 
     return Container(
       padding: EdgeInsets.all(16),
@@ -399,44 +441,45 @@ class _TeacherSendRemarkPageState extends State<TeacherSendRemarkPage> {
               ),
               Spacer(),
               Text(
-                '${remark.createdAt.day}/${remark.createdAt.month}/${remark.createdAt.year}',
+                '${createdAt.day}/${createdAt.month}/${createdAt.year}',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
           SizedBox(height: 12),
           Text(
-            remark.message,
+            message,
             style: TextStyle(fontSize: 14, height: 1.5),
           ),
-          if (remark.hasResponse) ...[
+          if (hasResponse) ...[
             SizedBox(height: 12),
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green[200]!),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.admin_panel_settings, size: 16, color: Color(0xFF4F6F52)),
+                      Icon(Icons.admin_panel_settings, size: 16, color: Colors.green[700]),
                       SizedBox(width: 6),
                       Text(
                         'رد الإدارة:',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF4F6F52),
+                          color: Colors.green[700],
                         ),
                       ),
                     ],
                   ),
                   SizedBox(height: 8),
                   Text(
-                    remark.adminResponse!,
+                    adminResponse!,
                     style: TextStyle(fontSize: 13, height: 1.4),
                   ),
                 ],

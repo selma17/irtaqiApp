@@ -3,8 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
-import 'dart:html' as html;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html show Blob, Url, AnchorElement;
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class AttendanceDetailsPage extends StatefulWidget {
   final String attendanceId;
@@ -270,7 +274,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
         child: DataTable(
           headingRowColor: MaterialStateProperty.all(Color(0xFF4F6F52).withOpacity(0.1)),
           headingRowHeight: 45,
-          dataRowHeight: 82,
+          dataRowHeight: 80,
           columnSpacing: 12,
           horizontalMargin: 12,
           columns: [
@@ -587,12 +591,27 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
 
       String csv = const ListToCsvConverter().convert(rows);
       final bytes = utf8.encode(csv);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', 'attendance_${widget.month}_week${selectedWeek + 1}.csv')
-        ..click();
-      html.Url.revokeObjectUrl(url);
+      
+      if (kIsWeb) {
+        // Version Web
+        final blob = html.Blob([bytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', 'attendance_${widget.month}_week${selectedWeek + 1}.csv')
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        // Version Mobile
+        final directory = await getApplicationDocumentsDirectory();
+        final path = '${directory.path}/attendance_${widget.month}_week${selectedWeek + 1}.csv';
+        final file = File(path);
+        await file.writeAsBytes(bytes);
+        
+        await Share.shareXFiles(
+          [XFile(path)],
+          text: 'فيش الحضور - ${widget.groupName}',
+        );
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -604,7 +623,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
       print('Erreur export: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ أثناء التصدير'),
+          content: Text('حدث خطأ أثناء التصدير: $e'),
           backgroundColor: Colors.red,
         ),
       );
