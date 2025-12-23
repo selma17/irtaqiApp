@@ -1,5 +1,5 @@
 // lib/screens/admin/send_announcement_page.dart
-// ✅ VERSION FINALE CORRIGÉE - Image s'affiche instantanément sur web
+// ✅ VERSION DEBUG - Upload image avec logs détaillés
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -28,7 +28,6 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
   List<Map<String, dynamic>> _groups = [];
   bool _isLoading = false;
   
-  // ✅ dynamic pour supporter web (XFile) et mobile (File)
   dynamic _selectedImage;
 
   @override
@@ -67,11 +66,14 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
       
       if (image != null) {
         print('✅ Image sélectionnée: ${image.path}');
+        print('✅ Image name: ${image.name}');
+        print('✅ Image size: ${await image.length()} bytes');
+        
         setState(() {
           if (kIsWeb) {
-            _selectedImage = image;  // Garder XFile sur web
+            _selectedImage = image;
           } else {
-            _selectedImage = File(image.path);  // Convertir en File sur mobile
+            _selectedImage = File(image.path);
           }
         });
         print('✅ _selectedImage défini: ${_selectedImage != null}');
@@ -87,38 +89,84 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
     }
   }
 
+  // ✅ UPLOAD IMAGE AMÉLIORÉ avec logs détaillés
   Future<String?> _uploadImage() async {
-    if (_selectedImage == null) return null;
+    if (_selectedImage == null) {
+      print('⚠️ Pas d\'image à uploader');
+      return null;
+    }
 
     try {
+      print('📤 Début upload image...');
+      
       String fileName = 'announcements/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      print('📁 Nom fichier: $fileName');
+      
       Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
+      print('📦 Référence créée: ${storageRef.fullPath}');
       
       UploadTask uploadTask;
       
       if (kIsWeb) {
-        // Sur web : upload bytes
+        print('🌐 Mode WEB - Upload bytes');
         final bytes = await (_selectedImage as XFile).readAsBytes();
-        uploadTask = storageRef.putData(bytes);
+        print('📊 Taille bytes: ${bytes.length}');
+        
+        uploadTask = storageRef.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
       } else {
-        // Sur mobile : upload file
-        uploadTask = storageRef.putFile(_selectedImage as File);
+        print('📱 Mode MOBILE - Upload file');
+        print('📂 File path: ${(_selectedImage as File).path}');
+        
+        uploadTask = storageRef.putFile(
+          _selectedImage as File,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
       }
       
-      TaskSnapshot snapshot = await uploadTask;
-      String downloadUrl = await snapshot.ref.getDownloadURL();
+      print('⏳ Upload en cours...');
       
-      print('✅ Image uploadée: $downloadUrl');
+      // Écouter la progression
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        double progress = snapshot.bytesTransferred / snapshot.totalBytes;
+        print('📈 Progression: ${(progress * 100).toStringAsFixed(1)}%');
+      });
+      
+      TaskSnapshot snapshot = await uploadTask;
+      print('✅ Upload terminé! State: ${snapshot.state}');
+      
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+      print('🔗 URL téléchargement: $downloadUrl');
+      
       return downloadUrl;
-    } catch (e) {
-      print('❌ Erreur upload image: $e');
+    } catch (e, stackTrace) {
+      print('❌ ERREUR UPLOAD IMAGE:');
+      print('❌ Message: $e');
+      print('❌ Stack trace: $stackTrace');
+      
+      // Afficher l'erreur à l'utilisateur
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ فشل رفع الصورة: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      
       return null;
     }
   }
 
   Future<void> _sendAnnouncement() async {
+    print('\n🚀 === DÉBUT ENVOI ANNONCE ===');
+    
     // Validation
     if (_titleController.text.trim().isEmpty) {
+      print('❌ Titre vide');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ يرجى إدخال عنوان الإعلان'),
@@ -129,6 +177,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
     }
 
     if (_selectedImage == null && _contentController.text.trim().isEmpty) {
+      print('❌ Pas de contenu ni d\'image');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ يرجى إدخال محتوى الإعلان أو اختيار صورة'),
@@ -139,6 +188,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
     }
 
     if (_targetAudience == 'group' && _selectedGroupId == null) {
+      print('❌ Groupe non sélectionné');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ يرجى اختيار المجموعة'),
@@ -151,13 +201,22 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
     setState(() => _isLoading = true);
 
     try {
+      print('📸 Image à uploader: ${_selectedImage != null}');
+      
       // Upload image si existe
       String? imageUrl;
       if (_selectedImage != null) {
+        print('🖼️ Upload de l\'image...');
         imageUrl = await _uploadImage();
+        
         if (imageUrl == null) {
-          throw Exception('فشل رفع الصورة');
+          print('⚠️ Upload image a échoué, mais on continue sans image');
+          // On ne lance pas d'exception, on continue sans image
+        } else {
+          print('✅ Image uploadée avec succès: $imageUrl');
         }
+      } else {
+        print('ℹ️ Pas d\'image à uploader');
       }
 
       // Préparer les données
@@ -169,9 +228,13 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
         'groupId': _selectedGroupId,
         'createdAt': FieldValue.serverTimestamp(),
       };
+      
+      print('📝 Données annonce: $announcementData');
 
       // Envoyer l'annonce
-      await _firestore.collection('announcements').add(announcementData);
+      print('💾 Sauvegarde dans Firestore...');
+      DocumentReference docRef = await _firestore.collection('announcements').add(announcementData);
+      print('✅ Annonce sauvegardée avec ID: ${docRef.id}');
 
       // Succès
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,13 +253,18 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
         _selectedGroupId = null;
       });
 
+      print('🎉 === ENVOI RÉUSSI ===\n');
       Navigator.pop(context);
-    } catch (e) {
-      print('Erreur envoi annonce: $e');
+    } catch (e, stackTrace) {
+      print('❌ === ERREUR ENVOI ANNONCE ===');
+      print('❌ Message: $e');
+      print('❌ Stack trace: $stackTrace');
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ حدث خطأ أثناء الإرسال: $e'),
           backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
         ),
       );
     } finally {
@@ -362,7 +430,7 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                       ),
                       SizedBox(height: 20),
 
-                      // ✅ Section Image CORRIGÉE
+                      // Section Image
                       Text(
                         'الصورة (اختياري)',
                         style: TextStyle(
@@ -373,7 +441,6 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                       ),
                       SizedBox(height: 8),
                       
-                      // ✅ AFFICHAGE IMAGE CORRIGÉ - INSTANTANÉ SUR WEB
                       if (_selectedImage != null) ...[
                         Stack(
                           children: [
@@ -386,9 +453,8 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: kIsWeb
-                                    // ✅ WEB : Image.network avec blob URL (INSTANTANÉ)
                                     ? Image.network(
-                                        (_selectedImage as XFile).path,  // blob:http://...
+                                        (_selectedImage as XFile).path,
                                         fit: BoxFit.cover,
                                         width: double.infinity,
                                         height: 200,
@@ -413,7 +479,6 @@ class _SendAnnouncementPageState extends State<SendAnnouncementPage> {
                                           );
                                         },
                                       )
-                                    // ✅ MOBILE : Image.file
                                     : Image.file(
                                         _selectedImage as File,
                                         fit: BoxFit.cover,

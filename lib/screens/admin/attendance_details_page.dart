@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' as html show Blob, Url, AnchorElement;
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'dart:io';
+import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 
 class AttendanceDetailsPage extends StatefulWidget {
   final String attendanceId;
@@ -559,68 +561,77 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
   }
 
   Future<void> _exportToExcel() async {
-    try {
-      List<List<dynamic>> rows = [];
-      
-      // Header
-      rows.add(['المجموعة', widget.groupName]);
-      rows.add(['الشهر', widget.month]);
-      rows.add(['الأستاذ', widget.profName]);
-      rows.add(['الأسبوع', 'الأسبوع ${selectedWeek + 1}']);
-      rows.add([]);
-      
-      // Table header
-      rows.add(['الطالب', 'اليوم 1 تسميع', 'اليوم 1 واجب', 'اليوم 2 تسميع', 'اليوم 2 واجب']);
-      
-      // Data
-      Map<String, dynamic> students = attendanceData['students'] ?? {};
-      students.forEach((studentId, data) {
-        String studentName = studentsData[studentId]?['firstName'] ?? 'طالب';
-        Map<String, dynamic> studentData = data as Map<String, dynamic>;
-        
-        List<dynamic> row = [studentName];
-        for (int day = 0; day < 2; day++) {
-          String tasmi3Key = '${studentId}_w${selectedWeek}_d${day}_tasmi3';
-          String wajibKey = '${studentId}_w${selectedWeek}_d${day}_wajib';
-          
-          row.add(studentData[tasmi3Key] ?? '');
-          row.add(studentData[wajibKey] ?? '');
-        }
-        rows.add(row);
-      });
+    List<List<dynamic>> rows = [];
 
-      String csv = const ListToCsvConverter().convert(rows);
-      final bytes = utf8.encode(csv);
-      
-      if (kIsWeb) {
-        // Version Web
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
-          ..setAttribute('download', 'attendance_${widget.month}_week${selectedWeek + 1}.csv')
-          ..click();
-        html.Url.revokeObjectUrl(url);
-      } else {
-        // Version Mobile
-        final directory = await getApplicationDocumentsDirectory();
-        final path = '${directory.path}/attendance_${widget.month}_week${selectedWeek + 1}.csv';
-        final file = File(path);
-        await file.writeAsBytes(bytes);
-        
-        await Share.shareXFiles(
-          [XFile(path)],
-          text: 'فيش الحضور - ${widget.groupName}',
-        );
+    // Header
+    rows.add(['المجموعة', widget.groupName]);
+    rows.add(['الشهر', _formatMonth(widget.month)]);
+    rows.add(['الأستاذ', widget.profName]);
+    rows.add(['الأسبوع', 'الأسبوع ${selectedWeek + 1}']);
+    rows.add([]);
+
+    // Table header
+    rows.add([
+      'الطالب',
+      'اليوم 1 تسميع',
+      'اليوم 1 واجب',
+      'اليوم 2 تسميع',
+      'اليوم 2 واجب',
+    ]);
+
+    // Data
+    Map<String, dynamic> students = attendanceData['students'] ?? {};
+
+    students.forEach((studentId, data) {
+      String studentName =
+          studentsData[studentId]?['firstName'] ?? 'طالب';
+
+      Map<String, dynamic> studentData = data as Map<String, dynamic>;
+
+      List<dynamic> row = [studentName];
+
+      for (int day = 0; day < 2; day++) {
+        String tasmi3Key =
+            '${studentId}_w${selectedWeek}_d${day}_tasmi3';
+        String wajibKey =
+            '${studentId}_w${selectedWeek}_d${day}_wajib';
+
+        row.add(studentData[tasmi3Key] ?? '');
+        row.add(studentData[wajibKey] ?? '');
       }
 
+      rows.add(row);
+    });
+
+    // ⬅️ APPEL RÉEL DE L’EXPORT
+    await exportCsv(context, rows);
+}
+
+  Future<void> exportCsv(
+    BuildContext context,
+    List<List<dynamic>> rows,
+  ) async {
+    try {
+      String csv = const ListToCsvConverter().convert(rows);
+      final bytes = utf8.encode(csv);
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/attendance.csv');
+
+      await file.writeAsBytes(bytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'فيش الحضور',
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('✓ تم تصدير البيانات بنجاح'),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      print('Erreur export: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ أثناء التصدير: $e'),
