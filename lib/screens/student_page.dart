@@ -1,5 +1,3 @@
-// lib/screens/student/student_dashboard.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
@@ -11,6 +9,7 @@ import 'student/counter_page.dart';
 import 'student/send_remark_page.dart';
 import 'student/account_settings_page.dart';
 import 'student/student_exams_page.dart';
+import 'student/student_announcements_page.dart';  // ✅ NOUVELLE PAGE
 
 class StudentPage extends StatefulWidget {
   @override
@@ -58,6 +57,10 @@ class _StudentPageState extends State<StudentPage> {
           title: Text('الصفحة الرئيسية'),
           backgroundColor: Color(0xFF4F6F52),
           elevation: 0,
+          actions: [
+            // ✅ BADGE NOTIFICATION ANNONCES
+            _buildNotificationBadge(),
+          ],
         ),
         drawer: _buildDrawer(),
         body: isLoading
@@ -73,10 +76,94 @@ class _StudentPageState extends State<StudentPage> {
                     SizedBox(height: 20),
                     _buildQuickActions(),
                     SizedBox(height: 20),
-                    _buildAnnouncements(),
+                    _buildAnnouncementsPreview(),
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  // ✅ NOUVEAU : Badge notification avec compteur
+  Widget _buildNotificationBadge() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('announcements').snapshots(),
+      builder: (context, announcementSnapshot) {
+        if (!announcementSnapshot.hasData) {
+          return IconButton(
+            icon: Icon(Icons.notifications_outlined),
+            onPressed: () => _navigateToAnnouncements(),
+          );
+        }
+
+        return StreamBuilder<DocumentSnapshot>(
+          stream: _firestore
+              .collection('users')
+              .doc(currentUser?.id)
+              .snapshots(),
+          builder: (context, userSnapshot) {
+            int unreadCount = 0;
+
+            if (userSnapshot.hasData && userSnapshot.data!.exists) {
+              Map<String, dynamic> userData = userSnapshot.data!.data() as Map<String, dynamic>;
+              List<String> readAnnouncements = List<String>.from(
+                userData['readAnnouncements'] ?? []
+              );
+
+              List<String> allAnnouncementIds = announcementSnapshot.data!.docs
+                  .map((doc) => doc.id)
+                  .toList();
+
+              unreadCount = allAnnouncementIds
+                  .where((id) => !readAnnouncements.contains(id))
+                  .length;
+            }
+
+            return Stack(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.notifications_outlined),
+                  onPressed: () => _navigateToAnnouncements(),
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 9 ? '9+' : unreadCount.toString(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _navigateToAnnouncements() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentAnnouncementsPage(),
       ),
     );
   }
@@ -181,6 +268,17 @@ class _StudentPageState extends State<StudentPage> {
                     );
                   },
                 ),
+                
+                // ✅ NOUVEAU : Item Annonces avec badge
+                _buildDrawerItemWithBadge(
+                  icon: Icons.campaign,
+                  title: 'الإعلانات',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToAnnouncements();
+                  },
+                ),
+                
                 _buildDrawerItem(
                   icon: Icons.message,
                   title: 'إرسال ملاحظة',
@@ -249,27 +347,93 @@ class _StudentPageState extends State<StudentPage> {
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isLogout ? Colors.red : Color(0xFF4F6F52),
-          size: 22,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isLogout ? Colors.red : Colors.black87,
-          ),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        onTap: onTap,
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isLogout ? Colors.red : Color(0xFF4F6F52),
       ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isLogout ? Colors.red : Colors.black87,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  // ✅ NOUVEAU : DrawerItem avec badge
+  Widget _buildDrawerItemWithBadge({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('announcements').snapshots(),
+      builder: (context, announcementSnapshot) {
+        return StreamBuilder<DocumentSnapshot>(
+          stream: _firestore
+              .collection('users')
+              .doc(currentUser?.id)
+              .snapshots(),
+          builder: (context, userSnapshot) {
+            int unreadCount = 0;
+
+            if (announcementSnapshot.hasData && 
+                userSnapshot.hasData && 
+                userSnapshot.data!.exists) {
+              Map<String, dynamic> userData = userSnapshot.data!.data() as Map<String, dynamic>;
+              List<String> readAnnouncements = List<String>.from(
+                userData['readAnnouncements'] ?? []
+              );
+
+              List<String> allAnnouncementIds = announcementSnapshot.data!.docs
+                  .map((doc) => doc.id)
+                  .toList();
+
+              unreadCount = allAnnouncementIds
+                  .where((id) => !readAnnouncements.contains(id))
+                  .length;
+            }
+
+            return ListTile(
+              leading: Icon(icon, color: Color(0xFF4F6F52)),
+              title: Text(
+                title,
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              trailing: unreadCount > 0
+                  ? Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        unreadCount > 9 ? '9+' : unreadCount.toString(),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : null,
+              onTap: onTap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -293,13 +457,10 @@ class _StudentPageState extends State<StudentPage> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.waving_hand, color: Colors.white, size: 32),
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white.withOpacity(0.2),
+            child: Icon(Icons.person, color: Colors.white, size: 30),
           ),
           SizedBox(width: 16),
           Expanded(
@@ -307,19 +468,19 @@ class _StudentPageState extends State<StudentPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'مرحباً بك',
+                  'مرحباً، ${currentUser?.firstName ?? "الطالب"}',
                   style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  currentUser?.firstName ?? 'الطالب',
+                  'استمر في المذاكرة والتقدم',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -333,7 +494,7 @@ class _StudentPageState extends State<StudentPage> {
   Widget _buildProgressCard() {
     int oldHafd = currentUser?.oldHafd ?? 0;
     int newHafd = currentUser?.newHafd ?? 0;
-    int totalHafd = oldHafd + newHafd;
+    int totalHafd = (oldHafd + newHafd).clamp(0, 60);
     double progress = totalHafd / 60;
 
     return Container(
@@ -354,7 +515,7 @@ class _StudentPageState extends State<StudentPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.book, color: Color(0xFF4F6F52)),
+              Icon(Icons.bar_chart, color: Color(0xFF4F6F52)),
               SizedBox(width: 8),
               Text(
                 'تقدم الحفظ',
@@ -367,54 +528,24 @@ class _StudentPageState extends State<StudentPage> {
             ],
           ),
           SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('الحفظ السابق', '$oldHafd', Colors.grey),
-              Container(width: 1, height: 40, color: Colors.grey[300]),
-              _buildStatItem('الحفظ الجديد', '$newHafd', Colors.green),
-              Container(width: 1, height: 40, color: Colors.grey[300]),
-              _buildStatItem('المجموع', '$totalHafd/60', Colors.blue),
-            ],
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.grey[200],
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F6F52)),
+            minHeight: 10,
+            borderRadius: BorderRadius.circular(5),
           ),
-          SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 12,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F6F52)),
-            ),
-          ),
-          SizedBox(height: 8),
+          SizedBox(height: 12),
           Text(
-            '${(progress * 100).toStringAsFixed(1)}% من القرآن الكريم',
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            textAlign: TextAlign.center,
+            '$totalHafd من 60 جزءاً',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-        ),
-      ],
     );
   }
 
@@ -430,9 +561,23 @@ class _StudentPageState extends State<StudentPage> {
             color: Color(0xFF4F6F52),
           ),
         ),
-        SizedBox(height: 12),
+        SizedBox(height: 16),
         Row(
           children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.badge,
+                title: 'الفيش',
+                color: Color(0xFF4F6F52),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => StudentProfileCardPage()),
+                  );
+                },
+              ),
+            ),
+            SizedBox(width: 12),
             Expanded(
               child: _buildActionCard(
                 icon: Icons.calculate,
@@ -500,7 +645,8 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  Widget _buildAnnouncements() {
+  // ✅ MODIFIÉ : Aperçu des annonces avec lien "Voir الكل"
+  Widget _buildAnnouncementsPreview() {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -518,31 +664,88 @@ class _StudentPageState extends State<StudentPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.notifications, color: Color(0xFF4F6F52)),
-              SizedBox(width: 8),
-              Text(
-                'الإعلانات',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4F6F52),
+              Row(
+                children: [
+                  Icon(Icons.campaign, color: Color(0xFF4F6F52)),
+                  SizedBox(width: 8),
+                  Text(
+                    'الإعلانات',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4F6F52),
+                    ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: _navigateToAnnouncements,
+                child: Text(
+                  'عرض الكل',
+                  style: TextStyle(color: Color(0xFF4F6F52)),
                 ),
               ),
             ],
           ),
           SizedBox(height: 16),
-          Center(
-            child: Column(
-              children: [
-                Icon(Icons.inbox, size: 60, color: Colors.grey[300]),
-                SizedBox(height: 8),
-                Text(
-                  'لا توجد إعلانات حالياً',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
+          StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('announcements')
+                .orderBy('createdAt', descending: true)
+                .limit(2)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.inbox, size: 60, color: Colors.grey[300]),
+                      SizedBox(height: 8),
+                      Text(
+                        'لا توجد إعلانات حالياً',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                children: snapshot.data!.docs.map((doc) {
+                  Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF4F6F52).withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Color(0xFF4F6F52).withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.campaign, size: 20, color: Color(0xFF4F6F52)),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            data['title'] ?? 'إعلان',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ),
