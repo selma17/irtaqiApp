@@ -589,8 +589,10 @@ class _TeacherPageState extends State<TeacherPage> {
 
   Widget _buildExamItem(ExamModel exam) {
     Color statusColor = exam.status == 'approved' ? Colors.orange : Colors.green;
-    int daysUntil = exam.examDate.difference(DateTime.now()).inDays;
-
+    // ✅ APRÈS - Vérifie null
+    int daysUntil = exam.examDate != null
+        ? exam.examDate!.difference(DateTime.now()).inDays
+        : 999; // Grande valeur pour mettre à la fin
     return Container(
       margin: EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.all(12),

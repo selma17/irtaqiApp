@@ -5,14 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FollowStudentPage extends StatefulWidget {
-  final String groupId;     // ✅ ID du groupe
+  final String? groupId;     // ✅ ID du groupe
   final String studentId;   // ✅ UID Firebase de l'étudiant
   final String firstName;
   final String lastName;
 
   const FollowStudentPage({
     super.key,
-    required this.groupId,    // ✅ AJOUTÉ pour sync admin
+    this.groupId,    // ✅ AJOUTÉ pour sync admin
     required this.studentId,
     required this.firstName,
     required this.lastName,
@@ -210,29 +210,17 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
                           return _buildWeekTable(index, week);
                         }).toList(),
                         const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ElevatedButton(
-                              onPressed: _addEmptyWeek,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF4F6F52),
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                              ),
-                              child: Text("إضافة صفحة متابعة جديدة"),
+                        // ✅ APRÈS
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: _addEmptyWeek,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF4F6F52),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                             ),
-                            const SizedBox(width: 20),
-                            ElevatedButton(
-                              onPressed: _showTestForm,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF4F6F52),
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                              ),
-                              child: Text("تخطيط اختبار"),
-                            ),
-                          ],
+                            child: Text("إضافة صفحة متابعة جديدة"),
+                          ),
                         ),
                         const SizedBox(height: 30),
                       ],

@@ -1,4 +1,5 @@
 // lib/screens/teacher/exams_page.dart
+// ✅ VERSION AVEC FILTRE PAR NOM D'ÉTUDIANT
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,6 +17,9 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
   final ExamService _examService = ExamService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late TabController _tabController;
+  
+  // ✅ AJOUTÉ : Contrôleur de recherche
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -50,12 +54,22 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
             ],
           ),
         ),
-        body: TabBarView(
-          controller: _tabController,
+        body: Column(
           children: [
-            _buildMyExamsTab(),
-            _buildAssignedExamsTab(),
-            _buildPendingExamsTab(),
+            // ✅ BARRE DE RECHERCHE
+            _buildSearchBar(),
+            
+            // TABS CONTENT
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMyExamsTab(),
+                  _buildAssignedExamsTab(),
+                  _buildPendingExamsTab(),
+                ],
+              ),
+            ),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
@@ -82,13 +96,49 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
     );
   }
 
+  // ✅ BARRE DE RECHERCHE
+  Widget _buildSearchBar() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.white,
+      child: TextField(
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value.toLowerCase();
+          });
+        },
+        decoration: InputDecoration(
+          hintText: 'ابحث عن طالب...',
+          prefixIcon: Icon(Icons.search, color: Color(0xFF4F6F52)),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Color(0xFFF6F3EE),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
+  }
+
   // ==================== TAB 1: MES EXAMENS ====================
   Widget _buildMyExamsTab() {
     return StreamBuilder<List<ExamModel>>(
       stream: _examService.getProfExamsStream(_auth.currentUser!.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: Color(0xFF4F6F52)));
         }
 
         if (snapshot.hasError) {
@@ -104,6 +154,20 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
         }
 
         List<ExamModel> exams = snapshot.data!;
+        
+        // ✅ FILTRER PAR NOM
+        if (_searchQuery.isNotEmpty) {
+          exams = exams.where((exam) {
+            return exam.studentName.toLowerCase().contains(_searchQuery);
+          }).toList();
+        }
+        
+        // Tri alphabétique
+        exams.sort((a, b) => a.studentName.compareTo(b.studentName));
+
+        if (exams.isEmpty && _searchQuery.isNotEmpty) {
+          return _buildNoResultsWidget();
+        }
 
         return ListView.builder(
           padding: EdgeInsets.all(16),
@@ -122,7 +186,7 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
       stream: _examService.getAssignedExamsStream(_auth.currentUser!.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: Color(0xFF4F6F52)));
         }
 
         if (snapshot.hasError) {
@@ -138,6 +202,20 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
         }
 
         List<ExamModel> exams = snapshot.data!;
+        
+        // ✅ FILTRER PAR NOM
+        if (_searchQuery.isNotEmpty) {
+          exams = exams.where((exam) {
+            return exam.studentName.toLowerCase().contains(_searchQuery);
+          }).toList();
+        }
+        
+        // Tri alphabétique
+        exams.sort((a, b) => a.studentName.compareTo(b.studentName));
+
+        if (exams.isEmpty && _searchQuery.isNotEmpty) {
+          return _buildNoResultsWidget();
+        }
 
         return ListView.builder(
           padding: EdgeInsets.all(16),
@@ -156,7 +234,7 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
       stream: _examService.getProfExamsStream(_auth.currentUser!.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: Color(0xFF4F6F52)));
         }
 
         if (snapshot.hasError) {
@@ -175,6 +253,20 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
         List<ExamModel> pendingExams = snapshot.data!
             .where((exam) => exam.type == '10ahzab' && exam.assignedProfId == null)
             .toList();
+        
+        // ✅ FILTRER PAR NOM
+        if (_searchQuery.isNotEmpty) {
+          pendingExams = pendingExams.where((exam) {
+            return exam.studentName.toLowerCase().contains(_searchQuery);
+          }).toList();
+        }
+        
+        // Tri alphabétique
+        pendingExams.sort((a, b) => a.studentName.compareTo(b.studentName));
+
+        if (pendingExams.isEmpty && _searchQuery.isNotEmpty) {
+          return _buildNoResultsWidget();
+        }
 
         if (pendingExams.isEmpty) {
           return _buildEmptyState(
@@ -198,278 +290,222 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
   // ==================== EXAM CARD ====================
   Widget _buildExamCard(ExamModel exam) {
     bool isPending = exam.status == 'pending';
-    bool isCompleted = exam.status == 'completed';
-    bool isAssigned = exam.status == 'assigned';
+    bool isGraded = exam.status == 'graded';
+    
+    String dateDisplay = exam.examDate != null
+        ? '${exam.examDate!.day}/${exam.examDate!.month}/${exam.examDate!.year}'
+        : 'غير محدد';
 
-    Color statusColor = isPending
-        ? Colors.orange
-        : isCompleted
-            ? Colors.green
-            : Colors.blue;
-
-    String statusText = isPending
-        ? 'قيد الانتظار'
-        : isCompleted
-            ? 'مكتمل'
-            : 'معين';
-
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ExamDetailsPage(exam: exam),
-            ),
-          );
-        },
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      isCompleted
-                          ? Icons.check_circle
-                          : isPending
-                              ? Icons.hourglass_empty
-                              : Icons.assignment,
-                      color: statusColor,
-                      size: 28,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          exam.studentName,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF4F6F52),
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                statusText,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: statusColor,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Color(0xFF4F6F52).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                exam.type == '5ahzab' ? 'اختبار 5 أحزاب' : 'اختبار 10 أحزاب',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF4F6F52),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.05),
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ExamDetailsPage(exam: exam),
               ),
-
-              Divider(height: 24),
-
-              // Info
-              _buildInfoRow(Icons.calendar_today, 'التاريخ',
-                  '${exam.examDate.day}/${exam.examDate.month}/${exam.examDate.year}'),
-              
-              if (exam.assignedProfName != null)
-                _buildInfoRow(Icons.person, 'الأستاذ المشرف', exam.assignedProfName!),
-
-              if (isCompleted && exam.score != null)
-                _buildInfoRow(Icons.grade, 'النتيجة', '${exam.score}/60'),
-
-              // Actions
-              if (isPending || isAssigned) ...[
-                SizedBox(height: 12),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (isPending)
-                      TextButton.icon(
-                        onPressed: () => _showCompleteDialog(exam),
-                        icon: Icon(Icons.check, size: 18),
-                        label: Text('تسجيل النتيجة'),
-                        style: TextButton.styleFrom(foregroundColor: Colors.green),
+                    // Nom étudiant
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            exam.studentName,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2C3E2F),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: exam.type == '10ahzab'
+                                      ? Colors.purple[50]
+                                      : Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  exam.typeDisplay,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: exam.type == '10ahzab'
+                                        ? Colors.purple[700]
+                                        : Colors.blue[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
+                    ),
+                    
+                    // Badge status
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isGraded
+                            ? Colors.green[50]
+                            : isPending
+                                ? Colors.orange[50]
+                                : Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isGraded
+                              ? Colors.green
+                              : isPending
+                                  ? Colors.orange
+                                  : Colors.blue,
+                          width: 2,
+                        ),
+                      ),
+                      child: Text(
+                        isGraded ? 'مكتمل' : exam.statusDisplay,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isGraded
+                              ? Colors.green[700]
+                              : isPending
+                                  ? Colors.orange[700]
+                                  : Colors.blue[700],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: Colors.grey[600]),
-          SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
-          Text(
-            value,
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== DIALOGS ====================
-  void _showCompleteDialog(ExamModel exam) {
-    int score = 30;
-    final feedbackController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: Text('تسجيل النتيجة'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('الطالب: ${exam.studentName}'),
-                  SizedBox(height: 16),
-                  Text('النتيجة: $score / 60'),
-                  Slider(
-                    value: score.toDouble(),
-                    min: 0,
-                    max: 60,
-                    divisions: 60,
-                    label: score.toString(),
-                    activeColor: Color(0xFF4F6F52),
-                    onChanged: (value) {
-                      setStateDialog(() {
-                        score = value.toInt();
-                      });
-                    },
-                  ),
-                  SizedBox(height: 16),
-                  TextField(
-                    controller: feedbackController,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      labelText: 'ملاحظات',
-                      border: OutlineInputBorder(),
-                      hintText: 'اكتب ملاحظاتك هنا...',
+                
+                SizedBox(height: 12),
+                Divider(height: 1, color: Colors.grey[300]),
+                SizedBox(height: 12),
+                
+                // Infos
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                    SizedBox(width: 6),
+                    Text(
+                      'التاريخ: $dateDisplay',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
+                    Spacer(),
+                    if (exam.assignedProfName != null) ...[
+                      Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                      SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'الأستاذ المشرف: ${exam.assignedProfName}',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                
+                if (exam.grade != null) ...[
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.star, size: 18, color: Colors.amber),
+                      SizedBox(width: 6),
+                      Text(
+                        'النتيجة: ',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '${exam.grade}/20',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: exam.grade! >= 15 ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text('إلغاء'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4F6F52)),
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  bool success = await _examService.completeExam(
-                    exam.id,
-                    score,
-                    feedbackController.text,
-                  );
-                  if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('✅ تم تسجيل النتيجة بنجاح'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-                child: Text('حفظ'),
-              ),
-            ],
           ),
         ),
       ),
     );
   }
 
-  // ==================== ÉTATS ====================
   Widget _buildEmptyState({
     required IconData icon,
     required String title,
     required String subtitle,
   }) {
     return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 80, color: Colors.grey[300]),
-            SizedBox(height: 20),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
-              ),
-              textAlign: TextAlign.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 100, color: Colors.grey[300]),
+          SizedBox(height: 24),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
             ),
-            SizedBox(height: 12),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ WIDGET AUCUN RÉSULTAT
+  Widget _buildNoResultsWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 100, color: Colors.grey[300]),
+          SizedBox(height: 24),
+          Text(
+            'لا توجد نتائج',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
             ),
-          ],
-        ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'لا يوجد امتحان يطابق "$_searchQuery"',
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -482,28 +518,16 @@ class _ExamsPageState extends State<ExamsPage> with SingleTickerProviderStateMix
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
-            SizedBox(height: 20),
+            SizedBox(height: 16),
             Text(
-              'حدث خطأ في تحميل البيانات',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.red[700],
-              ),
-              textAlign: TextAlign.center,
+              'حدث خطأ',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 8),
             Text(
               error.toString(),
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => setState(() {}),
-              icon: Icon(Icons.refresh),
-              label: Text('إعادة المحاولة'),
-              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4F6F52)),
             ),
           ],
         ),

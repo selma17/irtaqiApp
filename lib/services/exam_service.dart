@@ -1,4 +1,5 @@
 // lib/services/exam_service.dart
+// ✅ VERSION CORRIGÉE avec examDate nullable
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,7 +13,7 @@ class ExamService {
   Future<String?> createExam({
     required String studentId,
     required String type,
-    required DateTime examDate,
+    DateTime? examDate, // ✅ NULLABLE
     String? notes,
   }) async {
     try {
@@ -28,21 +29,24 @@ class ExamService {
       Map<String, dynamic> studentData = studentDoc.data() as Map<String, dynamic>;
       String studentName = '${studentData['firstName']} ${studentData['lastName']}';
 
-      // Déterminer assignedProfId
+      // Déterminer assignedProfId et date
       String? assignedProfId;
       String? assignedProfName;
       String status;
+      DateTime? finalExamDate;
 
       if (type == '10ahzab') {
-        // Pour 10 ahzab: status = pending, pas d'assignedProfId
+        // Pour 10 ahzab: status = pending, pas d'assignedProfId, pas de date
         status = 'pending';
         assignedProfId = null;
         assignedProfName = null;
+        finalExamDate = null; // ✅ Pas de date pour 10 ahzab en attente
       } else {
         // Pour 5 ahzab: status = pending, assignedProfId = profId créateur
         status = 'pending';
         assignedProfId = profId;
         assignedProfName = profName;
+        finalExamDate = examDate ?? DateTime.now().add(Duration(days: 7)); // ✅ Date par défaut
       }
 
       // Créer l'examen
@@ -50,14 +54,15 @@ class ExamService {
         'studentId': studentId,
         'studentName': studentName,
         'type': type,
-        'examDate': Timestamp.fromDate(examDate),
+        'examDate': finalExamDate != null ? Timestamp.fromDate(finalExamDate) : null, // ✅ Peut être null
         'status': status,
         'createdByProfId': profId,
         'createdByProfName': profName,
         'assignedProfId': assignedProfId,
         'assignedProfName': assignedProfName,
         'notes': notes ?? '',
-        'score': null,
+        'grade': null, // ✅ grade au lieu de score
+        'score': null, // ✅ Garder pour compatibilité
         'feedback': null,
         'completedAt': null,
         'createdAt': FieldValue.serverTimestamp(),
@@ -76,45 +81,96 @@ class ExamService {
   }
 
   /// Stream des examens créés par le prof (tous types confondus)
+  /// ✅ CORRIGÉ : Sans orderBy pour éviter erreur Timestamp null
   Stream<List<ExamModel>> getProfExamsStream(String profId) {
+    print('📊 getProfExamsStream pour profId: $profId');
     return _firestore
         .collection('exams')
         .where('createdByProfId', isEqualTo: profId)
-        .orderBy('examDate', descending: false)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ExamModel.fromDoc(doc)).toList();
+      print('📊 Nombre examens prof: ${snapshot.docs.length}');
+      List<ExamModel> exams = snapshot.docs.map((doc) {
+        try {
+          return ExamModel.fromDoc(doc);
+        } catch (e) {
+          print('❌ Erreur parsing exam ${doc.id}: $e');
+          return null;
+        }
+      }).whereType<ExamModel>().toList();
+      
+      // ✅ Tri côté client
+      exams.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
+      });
+      
+      return exams;
     });
   }
 
   /// Stream des examens ASSIGNÉS au prof (pour supervision)
+  /// ✅ CORRIGÉ : Sans orderBy
   Stream<List<ExamModel>> getAssignedExamsStream(String profId) {
+    print('📊 getAssignedExamsStream pour profId: $profId');
     return _firestore
         .collection('exams')
         .where('assignedProfId', isEqualTo: profId)
-        .orderBy('examDate', descending: false)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ExamModel.fromDoc(doc)).toList();
+      print('📊 Nombre examens assignés: ${snapshot.docs.length}');
+      List<ExamModel> exams = snapshot.docs.map((doc) {
+        try {
+          return ExamModel.fromDoc(doc);
+        } catch (e) {
+          print('❌ Erreur parsing exam ${doc.id}: $e');
+          return null;
+        }
+      }).whereType<ExamModel>().toList();
+      
+      // ✅ Tri côté client
+      exams.sort((a, b) {
+        if (a.examDate == null && b.examDate == null) return 0;
+        if (a.examDate == null) return 1;
+        if (b.examDate == null) return -1;
+        return a.examDate!.compareTo(b.examDate!);
+      });
+      
+      return exams;
     });
   }
 
   /// Stream des examens EN ATTENTE d'assignation (10 ahzab sans prof assigné)
+  /// ✅ CORRIGÉ : Sans where assignedProfId (pas d'index)
   Stream<List<ExamModel>> getPendingExamsStream() {
     return _firestore
         .collection('exams')
-        .where('status', isEqualTo: 'pending')
         .where('type', isEqualTo: '10ahzab')
-        .where('assignedProfId', isEqualTo: null)
-        .orderBy('examDate', descending: false)
+        .where('status', isEqualTo: 'pending')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ExamModel.fromDoc(doc)).toList();
+      // ✅ Filtrer côté client ceux sans assignedProfId
+      List<ExamModel> exams = snapshot.docs
+          .map((doc) {
+            try {
+              return ExamModel.fromDoc(doc);
+            } catch (e) {
+              print('❌ Erreur parsing exam ${doc.id}: $e');
+              return null;
+            }
+          })
+          .whereType<ExamModel>()
+          .where((exam) => exam.assignedProfId == null)
+          .toList();
+      
+      return exams;
     });
   }
 
   /// Assigner un examen 10ahzab à un prof
-  Future<bool> assignExam(String examId, String profId) async {
+  Future<bool> assignExam(String examId, String profId, DateTime examDate) async {
     try {
       // Récupérer le nom du prof
       DocumentSnapshot profDoc = await _firestore.collection('users').doc(profId).get();
@@ -124,11 +180,12 @@ class ExamService {
       await _firestore.collection('exams').doc(examId).update({
         'assignedProfId': profId,
         'assignedProfName': profName,
-        'status': 'assigned',
+        'examDate': Timestamp.fromDate(examDate), // ✅ Date choisie par admin
+        'status': 'approved', // ✅ approved au lieu de assigned
         'assignedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Examen $examId assigné au prof $profName');
+      print('✅ Examen $examId assigné au prof $profName pour le $examDate');
       return true;
     } catch (e) {
       print('❌ Erreur assignExam: $e');
@@ -137,16 +194,18 @@ class ExamService {
   }
 
   /// Marquer un examen comme complété avec note
-  Future<bool> completeExam(String examId, int score, String feedback) async {
+  Future<bool> completeExam(String examId, int grade, String feedback) async {
     try {
       await _firestore.collection('exams').doc(examId).update({
-        'status': 'completed',
-        'score': score,
-        'feedback': feedback,
+        'status': 'graded', // ✅ graded au lieu de completed
+        'grade': grade, // ✅ grade (0-20)
+        'score': grade, // ✅ Garder pour compatibilité
+        'notes': feedback, // ✅ notes au lieu de feedback
+        'feedback': feedback, // ✅ Garder pour compatibilité
         'completedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Examen $examId complété avec note: $score');
+      print('✅ Examen $examId complété avec note: $grade/20');
       return true;
     } catch (e) {
       print('❌ Erreur completeExam: $e');
@@ -196,19 +255,19 @@ class ExamService {
           .get();
 
       int total = snapshot.docs.length;
-      int completed = snapshot.docs.where((doc) => (doc.data() as Map)['status'] == 'completed').length;
+      int graded = snapshot.docs.where((doc) => (doc.data() as Map)['status'] == 'graded').length;
       int pending = snapshot.docs.where((doc) => (doc.data() as Map)['status'] == 'pending').length;
-      int assigned = snapshot.docs.where((doc) => (doc.data() as Map)['status'] == 'assigned').length;
+      int approved = snapshot.docs.where((doc) => (doc.data() as Map)['status'] == 'approved').length;
 
       return {
         'total': total,
-        'completed': completed,
+        'graded': graded,
         'pending': pending,
-        'assigned': assigned,
+        'approved': approved,
       };
     } catch (e) {
       print('❌ Erreur getProfExamStats: $e');
-      return {'total': 0, 'completed': 0, 'pending': 0, 'assigned': 0};
+      return {'total': 0, 'graded': 0, 'pending': 0, 'approved': 0};
     }
   }
 
@@ -220,17 +279,29 @@ class ExamService {
       QuerySnapshot snapshot = await _firestore
           .collection('exams')
           .where('assignedProfId', isEqualTo: profId)
-          .where('status', whereIn: ['pending', 'assigned'])
-          .orderBy('examDate')
-          .limit(limit)
+          .limit(limit * 2) // Prendre plus pour filtrer après
           .get();
 
       List<ExamModel> exams = snapshot.docs
-          .map((doc) => ExamModel.fromDoc(doc))
-          .where((exam) => exam.examDate.isAfter(now))
+          .map((doc) {
+            try {
+              return ExamModel.fromDoc(doc);
+            } catch (e) {
+              return null;
+            }
+          })
+          .whereType<ExamModel>()
+          .where((exam) => 
+              exam.examDate != null && 
+              exam.examDate!.isAfter(now) &&
+              (exam.status == 'pending' || exam.status == 'approved')
+          )
           .toList();
 
-      return exams;
+      // Trier par date
+      exams.sort((a, b) => a.examDate!.compareTo(b.examDate!));
+      
+      return exams.take(limit).toList();
     } catch (e) {
       print('❌ Erreur getUpcomingExams: $e');
       return [];

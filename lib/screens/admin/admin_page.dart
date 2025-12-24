@@ -13,6 +13,7 @@ import 'view_remarks_page.dart'; // ✅ REMARQUES
 import '../../services/activity_service.dart';
 import '../../services/stats_service.dart';
 import 'manage_attendance_page.dart';
+import 'admin_exams_dashboard.dart';
 
 
 class AdminPage extends StatefulWidget {
@@ -1007,6 +1008,20 @@ class _AdminPageState extends State<AdminPage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ManageStudentsPage(),
+                      ),
+                    );
+                  },
+                ),
+
+                _buildDrawerItem(
+                  icon: Icons.quiz_outlined,
+                  title: 'إدارة الامتحانات',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AdminExamsDashboard(),
                       ),
                     );
                   },

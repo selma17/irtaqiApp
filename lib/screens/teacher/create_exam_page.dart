@@ -1,9 +1,10 @@
 // lib/screens/teacher/create_exam_page.dart
+// ✅ Page création d'examen par le prof
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/exam_service.dart';
+import '../../models/user_model.dart';
 
 class CreateExamPage extends StatefulWidget {
   @override
@@ -11,83 +12,254 @@ class CreateExamPage extends StatefulWidget {
 }
 
 class _CreateExamPageState extends State<CreateExamPage> {
-  final _formKey = GlobalKey<FormState>();
-  final ExamService _examService = ExamService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
+  
+  String? selectedGroupId;
   String? selectedStudentId;
-  String? selectedStudentName;
   String selectedType = '5ahzab';
-  DateTime selectedDate = DateTime.now().add(Duration(days: 7));
-  final TextEditingController notesController = TextEditingController();
-
-  List<Map<String, dynamic>> students = [];
-  bool isLoadingStudents = true;
+  DateTime selectedDate = DateTime.now();
+  
+  List<Map<String, dynamic>> myGroups = [];
+  List<Map<String, dynamic>> groupStudents = [];
+  
+  bool isLoading = true;
+  bool isCreating = false;
+  
+  UserModel? currentUser;
 
   @override
   void initState() {
     super.initState();
-    _loadStudents();
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    notesController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadStudents() async {
+  Future<void> _loadData() async {
     try {
-      String profId = _auth.currentUser!.uid;
+      String? userId = _auth.currentUser?.uid;
+      if (userId == null) return;
 
-      // Récupérer les groupes du prof
+      // Charger info prof
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+      currentUser = UserModel.fromMap(userDoc.id, userDoc.data() as Map<String, dynamic>);
+
+      // Charger groupes du prof
       QuerySnapshot groupsSnapshot = await _firestore
           .collection('groups')
-          .where('profId', isEqualTo: profId)
+          .where('profId', isEqualTo: userId)
           .get();
 
-      Set<String> studentIds = {};
-      for (var groupDoc in groupsSnapshot.docs) {
-        List<dynamic> ids = (groupDoc.data() as Map<String, dynamic>)['studentIds'] ?? [];
-        studentIds.addAll(ids.cast<String>());
-      }
+      setState(() {
+        myGroups = groupsSnapshot.docs.map((doc) {
+          return {
+            'id': doc.id,
+            'name': doc['name'],
+            'studentIds': List<String>.from(doc['studentIds'] ?? []),
+          };
+        }).toList();
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Erreur chargement: $e');
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _loadGroupStudents(String groupId) async {
+    try {
+      var group = myGroups.firstWhere((g) => g['id'] == groupId);
+      List<String> studentIds = group['studentIds'];
 
       if (studentIds.isEmpty) {
         setState(() {
-          isLoadingStudents = false;
+          groupStudents = [];
         });
         return;
       }
 
-      // Récupérer les infos des étudiants
-      List<Map<String, dynamic>> loadedStudents = [];
+      // Charger les étudiants
+      List<Map<String, dynamic>> students = [];
       for (String studentId in studentIds) {
-        DocumentSnapshot studentDoc = await _firestore.collection('users').doc(studentId).get();
+        DocumentSnapshot studentDoc = await _firestore
+            .collection('users')
+            .doc(studentId)
+            .get();
+        
         if (studentDoc.exists) {
           Map<String, dynamic> data = studentDoc.data() as Map<String, dynamic>;
-          loadedStudents.add({
-            'id': studentId,
-            'firstName': data['firstName'] ?? '',
-            'lastName': data['lastName'] ?? '',
-            'fullName': '${data['firstName']} ${data['lastName']}',
-            'totalHafd': ((data['oldHafd'] ?? 0) as num).toInt() + ((data['newHafd'] ?? 0) as num).toInt(),
+          students.add({
+            'id': studentDoc.id,
+            'name': '${data['firstName']} ${data['lastName']}',
           });
         }
       }
 
-      // Trier par nom
-      loadedStudents.sort((a, b) => a['fullName'].compareTo(b['fullName']));
-
       setState(() {
-        students = loadedStudents;
-        isLoadingStudents = false;
+        groupStudents = students;
+        selectedStudentId = null;
       });
     } catch (e) {
-      print('❌ Erreur _loadStudents: $e');
+      print('Erreur chargement étudiants: $e');
+    }
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF4F6F52),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != selectedDate) {
       setState(() {
-        isLoadingStudents = false;
+        selectedDate = picked;
       });
+    }
+  }
+
+  Future<void> _createExam() async {
+    // Validation
+    if (selectedGroupId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ يرجى اختيار المجموعة'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (selectedStudentId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ يرجى اختيار الطالب'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => isCreating = true);
+
+    try {
+      var selectedGroup = myGroups.firstWhere((g) => g['id'] == selectedGroupId);
+      var selectedStudent = groupStudents.firstWhere((s) => s['id'] == selectedStudentId);
+
+      String status = selectedType == '10ahzab' ? 'pending' : 'pending';
+
+      // ✅ CORRECTION: Pour 10 ahzab, mettre date temporaire (sera changée par admin)
+      DateTime examDateToUse = selectedType == '5ahzab' 
+          ? selectedDate 
+          : DateTime.now().add(Duration(days: 30)); // Date provisoire
+
+      Map<String, dynamic> examData = {
+        'studentId': selectedStudentId,
+        'studentName': selectedStudent['name'],
+        'groupId': selectedGroupId,
+        'groupName': selectedGroup['name'],
+        'createdByProfId': currentUser!.id,
+        'createdByProfName': currentUser!.fullName,
+        'assignedProfId': selectedType == '5ahzab' ? currentUser!.id : null,
+        'assignedProfName': selectedType == '5ahzab' ? currentUser!.fullName : null,
+        'type': selectedType,
+        'examDate': Timestamp.fromDate(examDateToUse), // ✅ Toujours une date
+        'status': status,
+        'grade': null,
+        'notes': null,
+        'createdAt': FieldValue.serverTimestamp(),
+        'completedAt': null,
+      };
+
+      DocumentReference examRef = await _firestore.collection('exams').add(examData);
+
+      // Si 10 ahzab, créer notification pour admin
+      if (selectedType == '10ahzab') {
+        await _createAdminNotification(examRef.id, selectedStudent['name']);
+      }
+
+      // Notification pour l'étudiant
+      await _createStudentNotification(
+        selectedStudentId!,
+        selectedStudent['name'],
+        selectedType,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            selectedType == '10ahzab'
+                ? '✅ تم إنشاء الامتحان وإرسال طلب للإدارة'
+                : '✅ تم إنشاء الامتحان بنجاح',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      print('Erreur création examen: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ حدث خطأ: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => isCreating = false);
+    }
+  }
+
+  Future<void> _createAdminNotification(String examId, String studentName) async {
+    try {
+      // Récupérer tous les admins
+      QuerySnapshot adminsSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .get();
+
+      for (var adminDoc in adminsSnapshot.docs) {
+        await _firestore.collection('notifications').add({
+          'userId': adminDoc.id,
+          'title': 'طلب امتحان 10 أحزاب',
+          'message': 'الأستاذ ${currentUser!.fullName} يطلب تعيين أستاذ لامتحان 10 أحزاب للطالب $studentName',
+          'type': 'exam_10ahzab_request',
+          'examId': examId,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Erreur notification admin: $e');
+    }
+  }
+
+  Future<void> _createStudentNotification(
+    String studentId,
+    String studentName,
+    String type,
+  ) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': studentId,
+        'title': 'امتحان جديد',
+        'message': 'تم إنشاء امتحان ${type == "5ahzab" ? "5 أحزاب" : "10 أحزاب"} لك',
+        'type': 'exam_created',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Erreur notification étudiant: $e');
     }
   }
 
@@ -98,72 +270,69 @@ class _CreateExamPageState extends State<CreateExamPage> {
       child: Scaffold(
         backgroundColor: Color(0xFFF6F3EE),
         appBar: AppBar(
-          title: Text('إنشاء اختبار جديد'),
+          title: Text('إنشاء امتحان جديد'),
           backgroundColor: Color(0xFF4F6F52),
-          elevation: 0,
         ),
-        body: isLoadingStudents
-            ? Center(child: CircularProgressIndicator())
-            : students.isEmpty
-                ? _buildNoStudentsState()
-                : SingleChildScrollView(
-                    padding: EdgeInsets.all(16),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildInfoCard(),
-                          SizedBox(height: 20),
-                          _buildStudentSelection(),
-                          SizedBox(height: 20),
-                          _buildExamTypeSelection(),
-                          SizedBox(height: 20),
-                          _buildDateSelection(),
-                          SizedBox(height: 20),
-                          _buildNotesField(),
-                          SizedBox(height: 30),
-                          _buildSubmitButton(),
-                        ],
-                      ),
-                    ),
-                  ),
+        body: isLoading
+            ? Center(child: CircularProgressIndicator(color: Color(0xFF4F6F52)))
+            : SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoCard(),
+                    SizedBox(height: 24),
+                    _buildFormCard(),
+                    SizedBox(height: 24),
+                    _buildCreateButton(),
+                  ],
+                ),
+              ),
       ),
     );
   }
 
   Widget _buildInfoCard() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF4F6F52).withOpacity(0.1), Color(0xFF6B8F71).withOpacity(0.1)],
+          colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF4F6F52).withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: Color(0xFF4F6F52), size: 28),
-          SizedBox(width: 12),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.quiz, color: Colors.white, size: 32),
+          ),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ملاحظة هامة',
+                  'امتحان جديد',
                   style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Color(0xFF4F6F52),
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  '• اختبار 5 أحزاب: ستشرف عليه بنفسك\n• اختبار 10 أحزاب: سيتم تعيين أستاذ آخر',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                  'اختر الطالب ونوع الامتحان',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -173,424 +342,237 @@ class _CreateExamPageState extends State<CreateExamPage> {
     );
   }
 
-  Widget _buildStudentSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'اختر الطالب *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4F6F52),
+  Widget _buildFormCard() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
           ),
-        ),
-        SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: selectedStudentId,
-            decoration: InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: InputBorder.none,
-              prefixIcon: Icon(Icons.person, color: Color(0xFF4F6F52)),
-              hintText: 'اختر طالباً من مجموعاتك',
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sélection Groupe
+          Text(
+            'المجموعة *',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4F6F52),
             ),
-            items: students.map((student) {
+          ),
+          SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: selectedGroupId,
+            decoration: InputDecoration(
+              hintText: 'اختر المجموعة',
+              prefixIcon: Icon(Icons.group, color: Color(0xFF4F6F52)),
+              filled: true,
+              fillColor: Color(0xFFF6F3EE),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            items: myGroups.map((group) {
               return DropdownMenuItem<String>(
-                value: student['id'],
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        student['fullName'],
-                        style: TextStyle(fontSize: 15),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Color(0xFF4F6F52).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${student['totalHafd']} حزب',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF4F6F52),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                value: group['id'],
+                child: Text(group['name']),
               );
             }).toList(),
             onChanged: (value) {
               setState(() {
-                selectedStudentId = value;
-                selectedStudentName = students.firstWhere((s) => s['id'] == value)['fullName'];
+                selectedGroupId = value;
+                selectedStudentId = null;
+              });
+              if (value != null) {
+                _loadGroupStudents(value);
+              }
+            },
+          ),
+          SizedBox(height: 20),
+
+          // Sélection Étudiant
+          Text(
+            'الطالب *',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4F6F52),
+            ),
+          ),
+          SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: selectedStudentId,
+            decoration: InputDecoration(
+              hintText: selectedGroupId == null
+                  ? 'اختر المجموعة أولاً'
+                  : 'اختر الطالب',
+              prefixIcon: Icon(Icons.person, color: Color(0xFF4F6F52)),
+              filled: true,
+              fillColor: Color(0xFFF6F3EE),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            items: groupStudents.map((student) {
+              return DropdownMenuItem<String>(
+                value: student['id'],
+                child: Text(student['name']),
+              );
+            }).toList(),
+            onChanged: selectedGroupId == null
+                ? null
+                : (value) {
+                    setState(() {
+                      selectedStudentId = value;
+                    });
+                  },
+          ),
+          SizedBox(height: 20),
+
+          // Type d'examen
+          Text(
+            'نوع الامتحان *',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4F6F52),
+            ),
+          ),
+          SizedBox(height: 12),
+          
+          RadioListTile<String>(
+            value: '5ahzab',
+            groupValue: selectedType,
+            onChanged: (value) {
+              setState(() {
+                selectedType = value!;
               });
             },
-            validator: (value) => value == null ? 'الرجاء اختيار الطالب' : null,
+            title: Text('5 أحزاب'),
+            subtitle: Text('امتحان عادي - أنت من سيقوم بالتقييم'),
+            activeColor: Color(0xFF4F6F52),
           ),
-        ),
-      ],
-    );
-  }
+          
+          RadioListTile<String>(
+            value: '10ahzab',
+            groupValue: selectedType,
+            onChanged: (value) {
+              setState(() {
+                selectedType = value!;
+              });
+            },
+            title: Text('10 أحزاب'),
+            subtitle: Text('امتحان خاص - سيتم تعيين أستاذ آخر من قبل الإدارة'),
+            activeColor: Color(0xFF4F6F52),
+          ),
+          
+          SizedBox(height: 20),
 
-  Widget _buildExamTypeSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'نوع الاختبار *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4F6F52),
-          ),
-        ),
-        SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildTypeCard(
-                type: '5ahzab',
-                title: '5 أحزاب',
-                subtitle: 'ستشرف عليه',
-                icon: Icons.assignment,
-                isSelected: selectedType == '5ahzab',
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: _buildTypeCard(
-                type: '10ahzab',
-                title: '10 أحزاب',
-                subtitle: 'أستاذ آخر',
-                icon: Icons.assignment_turned_in,
-                isSelected: selectedType == '10ahzab',
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTypeCard({
-    required String type,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool isSelected,
-  }) {
-    return InkWell(
-      onTap: () => setState(() => selectedType = type),
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF4F6F52).withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? Color(0xFF4F6F52) : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: isSelected ? Color(0xFF4F6F52) : Colors.grey[600],
-            ),
-            SizedBox(height: 8),
+          // Date (seulement pour 5 ahzab)
+          if (selectedType == '5ahzab') ...[
             Text(
-              title,
+              'تاريخ الامتحان *',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? Color(0xFF4F6F52) : Colors.grey[800],
+                color: Color(0xFF4F6F52),
               ),
             ),
-            SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+            SizedBox(height: 8),
+            InkWell(
+              onTap: _selectDate,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xFFF6F3EE),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today, color: Color(0xFF4F6F52)),
+                    SizedBox(width: 12),
+                    Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    Spacer(),
+                    Icon(Icons.arrow_drop_down, color: Colors.grey),
+                  ],
+                ),
               ),
-              textAlign: TextAlign.center,
             ),
           ],
-        ),
+
+          if (selectedType == '10ahzab') ...[
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'سيتم إرسال طلب للإدارة لتعيين أستاذ وتحديد موعد الامتحان',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildDateSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'تاريخ الاختبار *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4F6F52),
-          ),
-        ),
-        SizedBox(height: 12),
-        InkWell(
-          onTap: () => _selectDate(),
-          child: Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.calendar_today, color: Color(0xFF4F6F52)),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'التاريخ المحدد',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNotesField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ملاحظات (اختياري)',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4F6F52),
-          ),
-        ),
-        SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: TextField(
-            controller: notesController,
-            maxLines: 4,
-            decoration: InputDecoration(
-              contentPadding: EdgeInsets.all(16),
-              border: InputBorder.none,
-              hintText: 'أضف أي ملاحظات أو تعليمات خاصة بالاختبار...',
-              hintStyle: TextStyle(color: Colors.grey[400]),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSubmitButton() {
+  Widget _buildCreateButton() {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 50,
       child: ElevatedButton(
-        onPressed: _handleSubmit,
+        onPressed: isCreating ? null : _createExam,
         style: ElevatedButton.styleFrom(
           backgroundColor: Color(0xFF4F6F52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 2,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, size: 24),
-            SizedBox(width: 12),
-            Text(
-              'إنشاء الاختبار',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNoStudentsState() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 80, color: Colors.grey[300]),
-            SizedBox(height: 20),
-            Text(
-              'لا يوجد طلاب',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+        child: isCreating
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : Text(
+                'إنشاء الامتحان',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'لا توجد طلاب في مجموعاتك حالياً\nلا يمكن إنشاء اختبار',
-              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Color(0xFF4F6F52),
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (selectedStudentId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('الرجاء اختيار الطالب')),
-      );
-      return;
-    }
-
-    // Confirmation
-    bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('تأكيد الإنشاء'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('هل تريد إنشاء هذا الاختبار؟'),
-            SizedBox(height: 16),
-            _buildConfirmItem('الطالب', selectedStudentName!),
-            _buildConfirmItem('النوع', selectedType == '5ahzab' ? '5 أحزاب' : '10 أحزاب'),
-            _buildConfirmItem('التاريخ', '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('إلغاء'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF4F6F52)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('تأكيد'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    // Afficher loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Center(child: CircularProgressIndicator()),
-    );
-
-    // Créer l'examen
-    String? examId = await _examService.createExam(
-      studentId: selectedStudentId!,
-      type: selectedType,
-      examDate: selectedDate,
-    );
-
-    Navigator.pop(context); // Fermer loading
-
-    if (examId != null) {
-      Navigator.pop(context, true); // Retourner avec succès
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ حدث خطأ أثناء إنشاء الاختبار'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Widget _buildConfirmItem(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
-          Text(
-            value,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          ),
-        ],
       ),
     );
   }
