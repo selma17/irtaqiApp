@@ -148,7 +148,7 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   Widget _buildStatsCards() {
-  return StreamBuilder<QuerySnapshot>(  // ✅ Stream en temps réel
+  return StreamBuilder<QuerySnapshot>(  // ✅ Stream 1: Users
     stream: _firestore.collection('users').snapshots(),
     builder: (context, userSnapshot) {
       if (!userSnapshot.hasData) {
@@ -160,7 +160,7 @@ class _AdminPageState extends State<AdminPage> {
         );
       }
 
-      // ✅ Calcul en temps réel
+      // ✅ Calcul étudiants et profs
       int totalStudents = userSnapshot.data!.docs
           .where((doc) {
             var data = doc.data() as Map<String, dynamic>;
@@ -175,54 +175,62 @@ class _AdminPageState extends State<AdminPage> {
           })
           .length;
 
-      return StreamBuilder<QuerySnapshot>(  // ✅ 2ème Stream pour les groupes
+      return StreamBuilder<QuerySnapshot>(  // ✅ Stream 2: Groups
         stream: _firestore.collection('groups').snapshots(),
         builder: (context, groupSnapshot) {
           int totalGroups = groupSnapshot.data?.docs.length ?? 0;
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              bool isWeb = constraints.maxWidth > 600;
-              int crossAxisCount = isWeb ? 4 : 2;
-              double aspectRatio = isWeb ? 1.3 : 1.1;
+          return StreamBuilder<QuerySnapshot>(  // ✅ Stream 3: Exams
+            stream: _firestore.collection('exams').snapshots(),
+            builder: (context, examSnapshot) {
+              // ✅ Compter TOUS les examens
+              int totalExams = examSnapshot.data?.docs.length ?? 0;
 
-              return GridView.count(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: aspectRatio,
-                children: [
-                  _buildStatCard(
-                    title: 'الطلاب',
-                    count: totalStudents,  // ✅ Valeur temps réel
-                    icon: Icons.school,
-                    color: Color(0xFF4F6F52),
-                    gradient: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-                  ),
-                  _buildStatCard(
-                    title: 'الأساتذة',
-                    count: totalTeachers,  // ✅ Valeur temps réel
-                    icon: Icons.person,
-                    color: Color(0xFF2D5F3F),
-                    gradient: [Color(0xFF2D5F3F), Color(0xFF4F6F52)],
-                  ),
-                  _buildStatCard(
-                    title: 'المجموعات',
-                    count: totalGroups,  // ✅ Valeur temps réel
-                    icon: Icons.groups,
-                    color: Color(0xFF739072),
-                    gradient: [Color(0xFF739072), Color(0xFF86A789)],
-                  ),
-                  _buildStatCard(
-                    title: 'الامتحانات',
-                    count: 0,
-                    icon: Icons.assignment,
-                    color: Color(0xFF5F7A61),
-                    gradient: [Color(0xFF5F7A61), Color(0xFF739072)],
-                  ),
-                ],
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  bool isWeb = constraints.maxWidth > 600;
+                  int crossAxisCount = isWeb ? 4 : 2;
+                  double aspectRatio = isWeb ? 1.3 : 1.1;
+
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: aspectRatio,
+                    children: [
+                      _buildStatCard(
+                        title: 'الطلاب',
+                        count: totalStudents,
+                        icon: Icons.school,
+                        color: Color(0xFF4F6F52),
+                        gradient: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
+                      ),
+                      _buildStatCard(
+                        title: 'الأساتذة',
+                        count: totalTeachers,
+                        icon: Icons.person,
+                        color: Color(0xFF2D5F3F),
+                        gradient: [Color(0xFF2D5F3F), Color(0xFF4F6F52)],
+                      ),
+                      _buildStatCard(
+                        title: 'المجموعات',
+                        count: totalGroups,
+                        icon: Icons.groups,
+                        color: Color(0xFF739072),
+                        gradient: [Color(0xFF739072), Color(0xFF86A789)],
+                      ),
+                      _buildStatCard(
+                        title: 'الامتحانات',
+                        count: totalExams,  // ✅ CORRIGÉ - Valeur temps réel
+                        icon: Icons.assignment,
+                        color: Color(0xFF5F7A61),
+                        gradient: [Color(0xFF5F7A61), Color(0xFF739072)],
+                      ),
+                    ],
+                  );
+                },
               );
             },
           );
