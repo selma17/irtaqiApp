@@ -7,6 +7,7 @@ import '../../services/activity_service.dart';
 import '../../models/user_model.dart';
 import '../view_followup_page.dart'; 
 import '../student/my_followup_list_page.dart'; 
+import '../../utils/validators.dart';
 
 class ManageStudentsPage extends StatefulWidget {
   @override
@@ -409,7 +410,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال الاسم' : null,
+                    validator: (value) => Validators.validateName(value, 'الاسم'),
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -419,7 +420,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person_outline),
                     ),
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال اللقب' : null,
+                    validator: (value) => Validators.validateName(value, 'اللقب'),
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -430,11 +431,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       prefixIcon: Icon(Icons.email),
                     ),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value!.isEmpty) return 'الرجاء إدخال البريد الإلكتروني';
-                      if (!value.contains('@')) return 'البريد الإلكتروني غير صالح';
-                      return null;
-                    },
+                    validator: Validators.validateEmail,
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -445,7 +442,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       prefixIcon: Icon(Icons.phone),
                     ),
                     keyboardType: TextInputType.phone,
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال رقم الهاتف' : null,
+                    validator: Validators.validatePhone,
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -456,7 +453,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       prefixIcon: Icon(Icons.cake),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال العمر' : null,
+                    validator: Validators.validateAge,
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -466,7 +463,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.location_city),
                     ),
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال المدينة' : null,
+                    validator: (value) => Validators.validateName(value, 'المدينة'),
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -478,14 +475,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       hintText: '0-60 أحزاب',
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value!.isEmpty) return 'الرجاء إدخال الحفظ السابق';
-                      int? val = int.tryParse(value);
-                      if (val == null || val < 0 || val > 60) {
-                        return 'يجب أن يكون بين 0 و 60';
-                      }
-                      return null;
-                    },
+                    validator: (value) => Validators.validateHafd(value, 'الحفظ القديم'),
                   ),
                   SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -698,7 +688,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال الاسم' : null,
+                    validator: (value) => Validators.validateName(value, 'الاسم')
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -708,7 +698,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person_outline),
                     ),
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال اللقب' : null,
+                    validator: (value) => Validators.validateName(value, 'اللقب'),
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -719,7 +709,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       prefixIcon: Icon(Icons.phone),
                     ),
                     keyboardType: TextInputType.phone,
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال رقم الهاتف' : null,
+                    validator: Validators.validatePhone,
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -730,7 +720,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       prefixIcon: Icon(Icons.cake),
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) => value!.isEmpty ? 'الرجاء إدخال العمر' : null,
+                    validator: Validators.validateAge,
                   ),
                   SizedBox(height: 12),
                   TextFormField(
@@ -751,14 +741,7 @@ class _ManageStudentsPageState extends State<ManageStudentsPage> {
                       hintText: '0-60 أحزاب',
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value!.isEmpty) return 'الرجاء إدخال الحفظ السابق';
-                      int? val = int.tryParse(value);
-                      if (val == null || val < 0 || val > 60) {
-                        return 'يجب أن يكون بين 0 و 60';
-                      }
-                      return null;
-                    },
+                    validator: (value) => Validators.validateHafd(value, 'الحفظ القديم'),
                   ),
                   SizedBox(height: 12),
                   DropdownButtonFormField<String>(

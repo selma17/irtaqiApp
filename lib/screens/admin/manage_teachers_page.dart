@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../services/activity_service.dart';
+import '../../utils/validators.dart';
 
 class ManageTeachersPage extends StatefulWidget {
   @override
@@ -365,8 +366,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال الاسم' : null,
+                  validator: (value) => Validators.validateName(value, 'الاسم'),
                 ),
                 SizedBox(height: 12),
                 TextFormField(
@@ -376,8 +376,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال اللقب' : null,
+                  validator: (value) => Validators.validateName(value, 'اللقب'),
                 ),
                 SizedBox(height: 12),
                 TextFormField(
@@ -388,11 +387,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value!.isEmpty) return 'الرجاء إدخال البريد الإلكتروني';
-                    if (!value.contains('@')) return 'البريد الإلكتروني غير صالح';
-                    return null;
-                  },
+                  validator: Validators.validateEmail,
                 ),
                 SizedBox(height: 12),
                 TextFormField(
@@ -403,8 +398,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     prefixIcon: Icon(Icons.phone),
                   ),
                   keyboardType: TextInputType.phone,
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال رقم الهاتف' : null,
+                  validator: Validators.validatePhone,
                 ),
                 SizedBox(height: 12),
                 TextFormField(
@@ -414,8 +408,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.location_city),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال المدينة' : null,
+                  validator: (value) => Validators.validateName(value, 'المدينة'),
                 ),
                 SizedBox(height: 12),
                 Container(
@@ -552,8 +545,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال الاسم' : null,
+                  validator: (value) => Validators.validateName(value, 'الاسم'),
                 ),
                 SizedBox(height: 12),
                 TextFormField(
@@ -563,8 +555,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person_outline),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال اللقب' : null,
+                  validator: (value) => Validators.validateName(value, 'اللقب'),
                 ),
                 SizedBox(height: 12),
                 TextFormField(
@@ -575,8 +566,7 @@ class _ManageTeachersPageState extends State<ManageTeachersPage> {
                     prefixIcon: Icon(Icons.phone),
                   ),
                   keyboardType: TextInputType.phone,
-                  validator: (value) =>
-                      value!.isEmpty ? 'الرجاء إدخال رقم الهاتف' : null,
+                  validator: Validators.validatePhone,
                 ),
                 SizedBox(height: 12),
                 TextFormField(

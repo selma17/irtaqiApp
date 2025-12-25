@@ -14,6 +14,7 @@ import '../../services/activity_service.dart';
 import '../../services/stats_service.dart';
 import 'manage_attendance_page.dart';
 import 'admin_exams_dashboard.dart';
+import 'add_admin_page.dart';
 
 
 class AdminPage extends StatefulWidget {
@@ -993,6 +994,27 @@ class _AdminPageState extends State<AdminPage> {
                   ),
                 ),
                 
+                ListTile(
+                  leading: Icon(Icons.admin_panel_settings, color: Color(0xFF4F6F52), size: 28),
+                  title: Text(
+                    'إضافة مشرف',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'إضافة مشرف جديد للنظام',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => AddAdminPage()),
+                    );
+                  },
+                ),
                 _buildDrawerItem(
                   icon: Icons.person_outline,
                   title: 'الأساتذة',
