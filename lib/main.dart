@@ -61,6 +61,7 @@ class IrtaqiApp extends StatelessWidget {
       ],
       locale: Locale('ar', ''),
       theme: ThemeData(
+        fontFamily: 'AmiriQuran',
         primarySwatch: Colors.green,
         primaryColor: Color(0xFF4F6F52),
       ),

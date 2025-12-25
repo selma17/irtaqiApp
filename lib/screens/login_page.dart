@@ -290,28 +290,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 SizedBox(height: 30),
-
-                // Aide pour test
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '🔐 حسابات الاختبار',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 8),
-                      Text('Admin: admin@test.com'),
-                      Text('Prof: prof@test.com'),
-                      Text('Étudiant: eleve@test.com'),
-                      Text('Mot de passe pour tous: (défini dans Firebase)'),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
