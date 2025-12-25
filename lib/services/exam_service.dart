@@ -307,4 +307,65 @@ class ExamService {
       return [];
     }
   }
+
+  Stream<List<ExamModel>> getStudentExamsStream(String studentId) {
+    print('📊 getStudentExamsStream pour studentId: $studentId');
+    return _firestore
+        .collection('exams')
+        .where('studentId', isEqualTo: studentId)
+        .snapshots()
+        .map((snapshot) {
+      print('📊 Nombre examens étudiant: ${snapshot.docs.length}');
+      List<ExamModel> exams = snapshot.docs.map((doc) {
+        try {
+          return ExamModel.fromDoc(doc);
+        } catch (e) {
+          print('❌ Erreur parsing exam ${doc.id}: $e');
+          return null;
+        }
+      }).whereType<ExamModel>().toList();
+      
+      // Tri côté client par date d'examen
+      exams.sort((a, b) {
+        if (a.examDate == null && b.examDate == null) return 0;
+        if (a.examDate == null) return 1;
+        if (b.examDate == null) return -1;
+        return a.examDate!.compareTo(b.examDate!);
+      });
+      
+      return exams;
+    });
+  }
+
+  /// Récupérer les examens à venir d'un étudiant (pour bannière)
+  Stream<List<ExamModel>> getStudentUpcomingExamsStream(String studentId) {
+    DateTime now = DateTime.now();
+    
+    return _firestore
+        .collection('exams')
+        .where('studentId', isEqualTo: studentId)
+        .snapshots()
+        .map((snapshot) {
+      List<ExamModel> exams = snapshot.docs
+          .map((doc) {
+            try {
+              return ExamModel.fromDoc(doc);
+            } catch (e) {
+              return null;
+            }
+          })
+          .whereType<ExamModel>()
+          .where((exam) => 
+              exam.examDate != null && 
+              exam.examDate!.isAfter(now) &&
+              (exam.status == 'pending' || exam.status == 'approved')
+          )
+          .toList();
+
+      // Trier par date (plus proche en premier)
+      exams.sort((a, b) => a.examDate!.compareTo(b.examDate!));
+      
+      return exams;
+    });
+  }
 }

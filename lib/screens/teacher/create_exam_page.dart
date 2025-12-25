@@ -19,6 +19,7 @@ class _CreateExamPageState extends State<CreateExamPage> {
   String? selectedStudentId;
   String selectedType = '5ahzab';
   DateTime selectedDate = DateTime.now();
+  TimeOfDay selectedTime = TimeOfDay(hour: 9, minute: 0); // ✅ Heure par défaut 9h00
   
   List<Map<String, dynamic>> myGroups = [];
   List<Map<String, dynamic>> groupStudents = [];
@@ -128,6 +129,32 @@ class _CreateExamPageState extends State<CreateExamPage> {
     }
   }
 
+  Future<void> _selectTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: selectedTime,
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.ltr, // Important pour le time picker
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.light(
+                primary: Color(0xFF4F6F52),
+              ),
+            ),
+            child: child!,
+          ),
+        );
+      },
+    );
+
+    if (picked != null && picked != selectedTime) {
+      setState(() {
+        selectedTime = picked;
+      });
+    }
+  }
+
   Future<void> _createExam() async {
     // Validation
     if (selectedGroupId == null) {
@@ -159,9 +186,20 @@ class _CreateExamPageState extends State<CreateExamPage> {
       String status = selectedType == '10ahzab' ? 'pending' : 'pending';
 
       // ✅ CORRECTION: Pour 10 ahzab, mettre date temporaire (sera changée par admin)
-      DateTime examDateToUse = selectedType == '5ahzab' 
-          ? selectedDate 
-          : DateTime.now().add(Duration(days: 30)); // Date provisoire
+      DateTime examDateToUse;
+      if (selectedType == '5ahzab') {
+        // Combiner la date sélectionnée avec l'heure sélectionnée
+        examDateToUse = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+          selectedTime.hour,
+          selectedTime.minute,
+        );
+      } else {
+        // Pour 10 ahzab, date provisoire (sera définie par admin)
+        examDateToUse = DateTime.now().add(Duration(days: 30));
+      } // Date provisoire
 
       Map<String, dynamic> examData = {
         'studentId': selectedStudentId,
@@ -479,6 +517,7 @@ class _CreateExamPageState extends State<CreateExamPage> {
           SizedBox(height: 20),
 
           // Date (seulement pour 5 ahzab)
+          // Date et heure (seulement pour 5 ahzab)
           if (selectedType == '5ahzab') ...[
             Text(
               'تاريخ الامتحان *',
@@ -504,10 +543,47 @@ class _CreateExamPageState extends State<CreateExamPage> {
                     SizedBox(width: 12),
                     Text(
                       '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                      style: TextStyle(fontSize: 16),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
                     ),
-                    Spacer(),
-                    Icon(Icons.arrow_drop_down, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+            
+            // ✅ NOUVEAU: Sélecteur d'heure
+            SizedBox(height: 20),
+            Text(
+              'وقت الامتحان *',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4F6F52),
+              ),
+            ),
+            SizedBox(height: 8),
+            InkWell(
+              onTap: _selectTime,
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xFFF6F3EE),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time, color: Color(0xFF4F6F52)),
+                    SizedBox(width: 12),
+                    Text(
+                      '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
+                    ),
                   ],
                 ),
               ),

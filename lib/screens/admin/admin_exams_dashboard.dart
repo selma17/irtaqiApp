@@ -728,6 +728,7 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
 
     String? selectedProfId;
     DateTime selectedDate = DateTime.now().add(const Duration(days: 7));
+    TimeOfDay selectedTime = TimeOfDay(hour: 9, minute: 0); // ✅ Heure par défaut 9h00
 
     if (!mounted) return;
     
@@ -801,6 +802,50 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
                     ),
                   ),
                 ),
+                
+                // ✅ NOUVEAU: Sélecteur d'heure
+                const SizedBox(height: 16),
+                const Text('وقت الامتحان:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: ctx,
+                      initialTime: selectedTime,
+                      builder: (context, child) {
+                        return Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFF4F6F52),
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                      },
+                    );
+                    if (picked != null) setDialogState(() => selectedTime = picked);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 20),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(fontSize: 16)
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
             actions: [
@@ -809,7 +854,7 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
                 child: const Text('إلغاء'),
               ),
               ElevatedButton(
-                onPressed: selectedProfId == null ? null : () => _assignProf(examId, selectedProfId!, selectedDate, profs),
+                onPressed: selectedProfId == null ? null : () => _assignProf(examId, selectedProfId!, selectedDate, selectedTime, profs),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4F6F52),
                   foregroundColor: Colors.white,
@@ -823,13 +868,23 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
     );
   }
 
-  Future<void> _assignProf(String examId, String profId, DateTime examDate, List<Map<String, dynamic>> profs) async {
+  Future<void> _assignProf(String examId, String profId, DateTime examDate, TimeOfDay examTime, List<Map<String, dynamic>> profs) async {
     try {
       var prof = profs.firstWhere((p) => p['id'] == profId);
+      
+      // ✅ Combiner date et heure
+      DateTime finalExamDateTime = DateTime(
+        examDate.year,
+        examDate.month,
+        examDate.day,
+        examTime.hour,
+        examTime.minute,
+      );
+      
       await _firestore.collection('exams').doc(examId).update({
         'assignedProfId': profId,
         'assignedProfName': prof['name'],
-        'examDate': Timestamp.fromDate(examDate),
+        'examDate': Timestamp.fromDate(finalExamDateTime), // ✅ Date + heure combinées
         'status': 'approved',
       });
 

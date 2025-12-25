@@ -9,7 +9,10 @@ import 'student/counter_page.dart';
 import 'student/send_remark_page.dart';
 import 'student/account_settings_page.dart';
 import 'student/student_exams_page.dart';
-import 'student/student_announcements_page.dart';  // ✅ NOUVELLE PAGE
+import 'student/student_announcements_page.dart';
+import '../../services/exam_service.dart';
+import '../../models/exam_model.dart';
+import '../../widgets/exam_notification_banner.dart';  // ✅ NOUVELLE PAGE
 
 class StudentPage extends StatefulWidget {
   @override
@@ -19,6 +22,7 @@ class StudentPage extends StatefulWidget {
 class _StudentPageState extends State<StudentPage> {
   final AuthService _authService = AuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ExamService _examService = ExamService();
   
   UserModel? currentUser;
   bool isLoading = true;
@@ -70,6 +74,9 @@ class _StudentPageState extends State<StudentPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ✅ NOUVEAU : Bannière d'examens à venir
+                    _buildExamNotificationBanner(),
+                    
                     _buildWelcomeCard(),
                     SizedBox(height: 20),
                     _buildProgressCard(),
@@ -432,6 +439,28 @@ class _StudentPageState extends State<StudentPage> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+  Widget _buildExamNotificationBanner() {
+    if (currentUser == null) return SizedBox.shrink();
+
+    return StreamBuilder<List<ExamModel>>(
+      stream: _examService.getStudentUpcomingExamsStream(currentUser!.id),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return SizedBox.shrink(); // Ne rien afficher pendant le chargement
+        }
+
+        List<ExamModel> upcomingExams = snapshot.data!;
+        
+        if (upcomingExams.isEmpty) {
+          return SizedBox.shrink(); // Pas d'examens à venir
+        }
+
+        return ExamNotificationBanner(
+          upcomingExams: upcomingExams,
         );
       },
     );

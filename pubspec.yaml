@@ -31,17 +31,20 @@ dependencies:
   flutter:
     sdk: flutter
 
+  firebase_messaging: ^16.1.0
+  flutter_local_notifications: ^19.5.0
+
   # Firebase
   firebase_core: ^4.3.0
-  firebase_auth: ^6.1.3
-  cloud_firestore: ^6.1.1
+  cloud_firestore: ^6.0.0
+  firebase_auth: ^6.0.0
   fl_chart: ^1.1.1
   shimmer: ^3.0.0
-  image_picker: ^1.1.2
+  image_picker: ^1.0.7
   firebase_storage: ^13.0.5
 
   # Autres packages
-  intl: ^0.20.2
+  intl: 0.20.2
 
   pdf: ^3.10.4
   printing: ^5.11.1
@@ -50,7 +53,7 @@ dependencies:
   csv: ^6.0.0
 
   path_provider: ^2.1.3
-  share_plus: ^10.0.2
+  share_plus: ^12.0.1
 
   flutter_localizations:  # ← Important !
     sdk: flutter

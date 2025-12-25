@@ -1,6 +1,8 @@
 // lib/screens/login_page.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/fcm_service.dart';  // ⭐ AJOUTÉ
 import 'admin/admin_page.dart';
 import 'teacher_page.dart';
 import 'student_page.dart';
@@ -39,44 +41,59 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
 
-    // Tentative de connexion
-    final result = await _authService.login(
-      emailController.text.trim(),
-      passwordController.text.trim(),
-    );
-
-    setState(() => _isLoading = false);
-
-    if (result['success']) {
-      // Succès - Navigation selon le rôle
-      String role = result['role'];
-      
-      if (!mounted) return;
-      
-      Widget page;
-      switch (role) {
-        case 'admin':
-          page = AdminPage();
-          break;
-        case 'prof':
-          page = TeacherPage();
-          break;
-        case 'etudiant':
-          page = StudentPage();
-          break;
-        default:
-          _showSnackBar('دور غير معروف', isError: true);
-          return;
-      }
-
-      // Navigation avec remplacement (pas de retour possible)
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => page),
+    try {
+      // Tentative de connexion
+      final result = await _authService.login(
+        emailController.text.trim(),
+        passwordController.text.trim(),
       );
-    } else {
-      // Échec - Afficher le message d'erreur
-      _showSnackBar(result['message'], isError: true);
+
+      if (result['success']) {
+        // ⭐ SAUVEGARDER LE FCM TOKEN ⭐
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FCMService().saveTokenToFirestore(user.uid);
+          print('✅ FCM Token sauvegardé pour: ${user.uid}');
+        }
+
+        // Succès - Navigation selon le rôle
+        String role = result['role'];
+        
+        if (!mounted) return;
+        
+        Widget page;
+        switch (role) {
+          case 'admin':
+            page = AdminPage();
+            break;
+          case 'prof':
+            page = TeacherPage();
+            break;
+          case 'etudiant':
+            page = StudentPage();
+            break;
+          default:
+            _showSnackBar('دور غير معروف', isError: true);
+            setState(() => _isLoading = false);
+            return;
+        }
+
+        // Navigation avec remplacement (pas de retour possible)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => page),
+        );
+      } else {
+        // Échec - Afficher le message d'erreur
+        _showSnackBar(result['message'], isError: true);
+      }
+    } catch (e) {
+      print('❌ Erreur lors du login: $e');
+      _showSnackBar('حدث خطأ أثناء تسجيل الدخول', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

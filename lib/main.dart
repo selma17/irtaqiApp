@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
 import 'screens/login_page.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; 
+import 'services/fcm_service.dart';
+
+// Handler pour messages en background
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('🔔 Message background: ${message.notification?.title}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,22 +21,23 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // ✅ CORRECTION: Désactiver la persistence pour éviter les erreurs d'index
-  // Cette ligne résout le problème "INTERNAL ASSERTION FAILED"
   try {
     await FirebaseFirestore.instance.clearPersistence();
     print("✅ Firestore persistence cleared");
   } catch (e) {
-    print("⚠️ Could not clear persistence (normal on first run): $e");
+    print("⚠️ Could not clear persistence: $e");
   }
   
-  // ✅ Configuration Firestore pour web
   FirebaseFirestore.instance.settings = Settings(
-    persistenceEnabled: false, // Désactiver la persistence
+    persistenceEnabled: false,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
   
   print("✅ Firebase initialized successfully!");
+  
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
+  await FCMService().initializeFCM();
   
   runApp(IrtaqiApp());
 }
@@ -38,7 +48,7 @@ class IrtaqiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false,  // ✅ Pas de bannière DEBUG
       title: 'إِرْتَقِ',
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
@@ -52,6 +62,7 @@ class IrtaqiApp extends StatelessWidget {
       locale: Locale('ar', ''),
       theme: ThemeData(
         primarySwatch: Colors.green,
+        primaryColor: Color(0xFF4F6F52),
       ),
       home: LoginPage(),
     );
