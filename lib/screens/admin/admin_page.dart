@@ -272,7 +272,7 @@ class _AdminPageState extends State<AdminPage> {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.all(20),
+        padding: EdgeInsets.all(14),  // ✅ CHANGÉ: 20 → 14
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -280,17 +280,21 @@ class _AdminPageState extends State<AdminPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
+                Flexible(  // ✅ AJOUTÉ: Flexible
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 13,  // ✅ CHANGÉ: 15 → 13
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                    overflow: TextOverflow.ellipsis,  // ✅ AJOUTÉ
                   ),
                 ),
+                SizedBox(width: 4),  // ✅ AJOUTÉ
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: EdgeInsets.all(10),  // ✅ CHANGÉ: 12 → 10
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: gradient,
@@ -306,16 +310,16 @@ class _AdminPageState extends State<AdminPage> {
                       ),
                     ],
                   ),
-                  child: Icon(icon, color: Colors.white, size: 26),
+                  child: Icon(icon, color: Colors.white, size: 24),  // ✅ CHANGÉ: 26 → 24
                 ),
               ],
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 10),  // ✅ CHANGÉ: 16 → 10
             Text(
               count.toString(),
               style: TextStyle(
                 color: color,
-                fontSize: 40,
+                fontSize: 34,  // ✅ CHANGÉ: 40 → 34
                 fontWeight: FontWeight.bold,
                 letterSpacing: -1,
               ),
@@ -326,14 +330,14 @@ class _AdminPageState extends State<AdminPage> {
               backgroundColor: color.withOpacity(0.1),
               valueColor: AlwaysStoppedAnimation<Color>(color),
               borderRadius: BorderRadius.circular(10),
-              minHeight: 4,
+              minHeight: 3,  // ✅ CHANGÉ: 4 → 3
             ),
           ],
         ),
       ),
     );
   }
-
+  
   Widget _buildProgressChart() {
     return Container(
       padding: EdgeInsets.all(20),

@@ -97,30 +97,13 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
               constraints: const BoxConstraints(),
             ),
             const SizedBox(width: 12),
-            
-            // Icône + Titre
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.assignment_outlined, color: Colors.white, size: 24),
-            ),
             const SizedBox(width: 12),
             const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'إدارة الامتحانات',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
-                  ),
-                ],
-              ),
+            child: Text(
+              'إدارة الامتحانات',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
+          ),
             
             // Stats compactes
             _buildCompactStats(),
@@ -160,7 +143,7 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
         int graded = snapshot.data!.docs.where((d) => (d.data() as Map)['status'] == 'graded').length;
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: const Color(0xFFF8F9FA),
             borderRadius: BorderRadius.circular(10),
@@ -184,8 +167,8 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
   Widget _buildMiniStat(int count, String label, Color color) {
     return Column(
       children: [
-        Text('$count', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+        Text('$count', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(fontSize: 8, color: Colors.grey)),
       ],
     );
   }
@@ -201,7 +184,7 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
       child: filtersExpanded
           ? Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Column(
                 children: [
                   // Barre de recherche
@@ -238,14 +221,13 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
                   // Filtres de date (inline)
                   Row(
                     children: [
-                      Expanded(flex: 2, child: _buildCompactYearFilter()),
-                      const SizedBox(width: 8),
-                      Expanded(flex: 2, child: _buildCompactMonthFilter()),
-                      const SizedBox(width: 8),
-                      Expanded(flex: 2, child: _buildCompactDayFilter()),
+                      Expanded(child: _buildCompactYearFilter()),
+                      const SizedBox(width: 4),
+                      Expanded(child: _buildCompactMonthFilter()),
+                      const SizedBox(width: 4),
+                      Expanded(child: _buildCompactDayFilter()),
                     ],
                   ),
-                  
                   const SizedBox(height: 12),
                   
                   // Filtres de statut (chips)
@@ -254,11 +236,11 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
                     child: Row(
                       children: [
                         _buildStatusChip('الكل', 'all', Icons.grid_view_rounded),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         _buildStatusChip('قيد الانتظار', 'pending', Icons.pending_outlined),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         _buildStatusChip('10 أحزاب', '10ahzab_pending', Icons.assignment_late_outlined),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         _buildStatusChip('مكتمل', 'graded', Icons.check_circle_outline),
                       ],
                     ),
@@ -272,8 +254,8 @@ class _AdminExamsDashboardState extends State<AdminExamsDashboard> {
 
   Widget _buildCompactYearFilter() {
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF8F9FA),
         borderRadius: BorderRadius.circular(8),

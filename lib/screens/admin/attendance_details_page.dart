@@ -346,7 +346,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
     if (!hasTasmi3 && !hasWajib) {
       return Container(
         width: 220,
-        padding: EdgeInsets.all(12),
+        padding: EdgeInsets.all(4),
         child: Center(
           child: Text(
             'غياب',
@@ -370,7 +370,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
             Expanded(
               child: Container(
                 margin: EdgeInsets.only(right: hasWajib ? 4 : 0),
-                padding: EdgeInsets.all(6),
+                padding: EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: Colors.green[50],
                   borderRadius: BorderRadius.circular(6),
@@ -394,7 +394,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 4),
+                    SizedBox(height: 3),
                     Text(
                       tasmi3,
                       style: TextStyle(
@@ -415,7 +415,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
             Expanded(
               child: Container(
                 margin: EdgeInsets.only(left: hasTasmi3 ? 4 : 0),
-                padding: EdgeInsets.all(6),
+                padding: EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   borderRadius: BorderRadius.circular(6),
@@ -512,6 +512,7 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
           SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatCard('تسميع', totalTasmi3, Colors.green),
               _buildStatCard('واجب', totalWajib, Colors.blue),
@@ -526,8 +527,8 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
   Widget _buildStatCard(String label, int value, Color color) {
     return Expanded(
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 4),
-        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        margin: EdgeInsets.symmetric(horizontal: 3),  // ✅ CHANGÉ: 4 → 3
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 6),  // ✅ CHANGÉ: 12/8 → 10/6
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
@@ -538,18 +539,19 @@ class _AttendanceDetailsPageState extends State<AttendanceDetailsPage> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,  // ✅ CHANGÉ: 12 → 11
                 color: Colors.grey[800]!,
                 fontWeight: FontWeight.bold,
               ),
+              overflow: TextOverflow.ellipsis,  // ✅ AJOUTÉ
             ),
-            SizedBox(height: 6),
+            SizedBox(height: 4),  // ✅ CHANGÉ: 6 → 4
             Text(
               value.toString(),
               style: TextStyle(
-                fontSize: 22,
-                color: Colors.grey[900]!,
+                fontSize: 20,  // ✅ CHANGÉ: 22 → 20
                 fontWeight: FontWeight.bold,
+                color: color,
               ),
             ),
           ],

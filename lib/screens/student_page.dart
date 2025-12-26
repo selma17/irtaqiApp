@@ -75,14 +75,13 @@ class _StudentPageState extends State<StudentPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ✅ NOUVEAU : Bannière d'examens à venir
-                    _buildExamNotificationBanner(),
-                    
                     _buildWelcomeCard(),
                     SizedBox(height: 20),
                     _buildProgressCard(),
                     SizedBox(height: 20),
                     _buildQuickActions(),
                     SizedBox(height: 20),
+                    _buildExamNotificationBanner(),
                     _buildAnnouncementsPreview(),
                   ],
                 ),
@@ -443,29 +442,7 @@ class _StudentPageState extends State<StudentPage> {
       },
     );
   }
-  Widget _buildExamNotificationBanner() {
-    if (currentUser == null) return SizedBox.shrink();
-
-    return StreamBuilder<List<ExamModel>>(
-      stream: _examService.getStudentUpcomingExamsStream(currentUser!.id),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return SizedBox.shrink(); // Ne rien afficher pendant le chargement
-        }
-
-        List<ExamModel> upcomingExams = snapshot.data!;
-        
-        if (upcomingExams.isEmpty) {
-          return SizedBox.shrink(); // Pas d'examens à venir
-        }
-
-        return ExamNotificationBanner(
-          upcomingExams: upcomingExams,
-        );
-      },
-    );
-  }
-
+  
   Widget _buildWelcomeCard() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -519,6 +496,30 @@ class _StudentPageState extends State<StudentPage> {
       ),
     );
   }
+
+  Widget _buildExamNotificationBanner() {
+    if (currentUser == null) return SizedBox.shrink();
+
+    return StreamBuilder<List<ExamModel>>(
+      stream: _examService.getStudentUpcomingExamsStream(currentUser!.id),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return SizedBox.shrink(); // Ne rien afficher pendant le chargement
+        }
+
+        List<ExamModel> upcomingExams = snapshot.data!;
+        
+        if (upcomingExams.isEmpty) {
+          return SizedBox.shrink(); // Pas d'examens à venir
+        }
+
+        return ExamNotificationBanner(
+          upcomingExams: upcomingExams,
+        );
+      },
+    );
+  }
+
 
   Widget _buildProgressCard() {
     int oldHafd = currentUser?.oldHafd ?? 0;
