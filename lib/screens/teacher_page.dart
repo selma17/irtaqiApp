@@ -95,7 +95,6 @@ class _TeacherPageState extends State<TeacherPage> {
                 SizedBox(height: 25),
                 _buildMemorizationRules(),
                 SizedBox(height: 25),
-                _buildAnnouncementsAccess(),
               ],
             ),
           ),
@@ -668,33 +667,6 @@ class _TeacherPageState extends State<TeacherPage> {
           SizedBox(width: 12),
           Expanded(child: Text(rule, style: TextStyle(fontSize: 15, height: 1.5))),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAnnouncementsAccess() {
-    return InkWell(
-      onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('صفحة الإعلانات قيد التطوير'))),
-      child: Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [Color(0xFF4F6F52).withOpacity(0.1), Color(0xFF6B8F71).withOpacity(0.1)], begin: Alignment.topRight, end: Alignment.bottomLeft),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(0xFF4F6F52).withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.campaign, color: Color(0xFF4F6F52), size: 28),
-                SizedBox(width: 12),
-                Text('الاطلاع على آخر المستجدات', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF4F6F52), decoration: TextDecoration.underline)),
-              ],
-            ),
-            Icon(Icons.arrow_forward_ios, color: Color(0xFF4F6F52), size: 18),
-          ],
-        ),
       ),
     );
   }

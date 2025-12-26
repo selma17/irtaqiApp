@@ -1,18 +1,19 @@
-// lib/screens/teacher/follow_student_page.dart - VERSION AVEC SYNCHRONISATION ADMIN
+// lib/screens/teacher/follow_student_page.dart
+// ✅ VERSION FINALE - Design vert + Sans overflow + Sauvegarde students_follow_up
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FollowStudentPage extends StatefulWidget {
-  final String? groupId;     // ✅ ID du groupe
-  final String studentId;   // ✅ UID Firebase de l'étudiant
+  final String? groupId;
+  final String studentId;
   final String firstName;
   final String lastName;
 
   const FollowStudentPage({
     super.key,
-    this.groupId,    // ✅ AJOUTÉ pour sync admin
+    this.groupId,
     required this.studentId,
     required this.firstName,
     required this.lastName,
@@ -46,7 +47,6 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
     _loadExistingRecords();
   }
 
-  // ✅ Charger les infos du groupe
   Future<void> _loadGroupInfo() async {
     try {
       DocumentSnapshot groupDoc = await _firestore
@@ -65,62 +65,37 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
     }
   }
 
-  // ✅ Charger les fiches existantes depuis attendance
+  // ✅ Charger depuis students_follow_up
   Future<void> _loadExistingRecords() async {
     setState(() {
       isLoading = true;
     });
     
     try {
-      // ✅ CORRIGÉ: Requête simplifiée sans orderBy pour éviter erreur d'index
       QuerySnapshot snapshot = await _firestore
-          .collection('attendance')
-          .where('groupId', isEqualTo: widget.groupId)
-          .where('profId', isEqualTo: _auth.currentUser?.uid)
+          .collection('students_follow_up')
+          .doc(widget.studentId)
+          .collection('weekly_records')
+          .orderBy('date', descending: true)
           .get();
 
       setState(() {
         weeklyRecords.clear();
         
-        // ✅ Liste temporaire pour trier
-        List<Map<String, dynamic>> tempRecords = [];
-        
         for (var doc in snapshot.docs) {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          Map<String, dynamic> weeklyData = data['weeklyRecords'] ?? {};
           
-          // Pour chaque semaine dans le document
-          weeklyData.forEach((weekKey, weekValue) {
-            if (weekValue is Map && weekValue.containsKey('students')) {
-              Map<String, dynamic> students = weekValue['students'];
-              
-              // Vérifier si cet étudiant est dans cette semaine
-              if (students.containsKey(widget.studentId)) {
-                Map<String, dynamic> studentData = students[widget.studentId];
-                
-                // Reconstruire le format attendu
-                tempRecords.add({
-                  "docId": doc.id,
-                  "weekKey": weekKey,
-                  "month": data['month'],
-                  "date": (studentData['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-                  "sura": studentData['sura'] ?? suras.keys.first,
-                  "verseFrom": List<int>.from(studentData['verseFrom'] ?? List.filled(7, 1)),
-                  "verseTo": List<int>.from(studentData['verseTo'] ?? List.filled(7, 1)),
-                  "revision": List<String>.from(studentData['revision'] ?? List.filled(7, "")),
-                  "notes": studentData['notes'] ?? "",
-                  "isSaved": true,
-                });
-              }
-            }
+          weeklyRecords.add({
+            'ficheId': doc.id,
+            'date': (data['date'] as Timestamp).toDate(),
+            'sura': data['sura'] ?? '',
+            'verseFrom': List<int>.from(data['verseFrom'] ?? List.filled(7, 1)),
+            'verseTo': List<int>.from(data['verseTo'] ?? List.filled(7, 1)),
+            'revision': List<String>.from(data['revision'] ?? List.filled(7, '')),
+            'notes': data['notes'] ?? '',
+            'isSaved': true,
           });
         }
-        
-        // ✅ Trier par date décroissante EN MÉMOIRE
-        tempRecords.sort((a, b) => (b["date"] as DateTime).compareTo(a["date"] as DateTime));
-        
-        // Ajouter à la liste finale
-        weeklyRecords.addAll(tempRecords);
         
         isLoading = false;
       });
@@ -132,17 +107,18 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
     }
   }
 
-  void _addEmptyWeek() {
-    weeklyRecords.insert(0, {
-      "date": DateTime.now(),
-      "sura": suras.keys.first,
-      "verseFrom": List.filled(7, 1),
-      "verseTo": List.filled(7, 1),
-      "revision": List.filled(7, ""),
-      "notes": "",
-      "isSaved": false,
+  void _addNewRecord() {
+    setState(() {
+      weeklyRecords.insert(0, {
+        'date': DateTime.now(),
+        'sura': suras.keys.first,
+        'verseFrom': List.filled(7, 1),
+        'verseTo': List.filled(7, 1),
+        'revision': List.filled(7, ''),
+        'notes': '',
+        'isSaved': false,
+      });
     });
-    setState(() {});
   }
 
   @override
@@ -152,361 +128,518 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
       child: Scaffold(
         backgroundColor: Color(0xFFF6F3EE),
         appBar: AppBar(
-          title: Text("جدول متابعة حفظ الطالب - ${widget.firstName} ${widget.lastName}"),
+          title: Text('جدول متابعة حفظ الطالب - ${widget.firstName} ${widget.lastName}'),
           backgroundColor: Color(0xFF4F6F52),
         ),
         body: isLoading
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      color: Color(0xFF4F6F52),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'جاري تحميل فيش المتابعة...',
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                  ],
-                ),
-              )
+            ? Center(child: CircularProgressIndicator(color: Color(0xFF4F6F52)))
             : weeklyRecords.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.assignment_outlined,
-                          size: 80,
-                          color: Colors.grey,
-                        ),
+                        Icon(Icons.event_note, size: 80, color: Colors.grey),
                         SizedBox(height: 16),
                         Text(
-                          'لا توجد فيش متابعة لهذا الطالب',
+                          'لا توجد صفحات متابعة',
                           style: TextStyle(fontSize: 18, color: Colors.grey),
                         ),
-                        SizedBox(height: 24),
+                        SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: _addEmptyWeek,
+                          onPressed: _addNewRecord,
                           icon: Icon(Icons.add),
-                          label: Text("إضافة فيش متابعة جديدة"),
+                          label: Text('إضافة صفحة متابعة جديدة'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFF4F6F52),
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
                         ),
                       ],
                     ),
                   )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        ...weeklyRecords.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          Map<String, dynamic> week = entry.value;
-                          return _buildWeekTable(index, week);
-                        }).toList(),
-                        const SizedBox(height: 20),
-                        // ✅ APRÈS
-                        Center(
-                          child: ElevatedButton(
-                            onPressed: _addEmptyWeek,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF4F6F52),
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            ),
-                            child: Text("إضافة صفحة متابعة جديدة"),
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                      ],
-                    ),
+                : ListView.builder(
+                    padding: EdgeInsets.all(16),
+                    itemCount: weeklyRecords.length,
+                    itemBuilder: (context, index) {
+                      return _buildWeeklyCard(index, weeklyRecords[index]);
+                    },
                   ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _addNewRecord,
+          backgroundColor: Color(0xFF4F6F52),
+          child: Icon(Icons.add),
+          tooltip: "إضافة صفحة متابعة جديدة",
+        ),
       ),
     );
   }
 
-  Widget _buildWeekTable(int weekIndex, Map<String, dynamic> week) {
+  Widget _buildWeeklyCard(int weekIndex, Map<String, dynamic> week) {
     bool isSaved = week["isSaved"] ?? false;
-    String? docId = week["docId"];
-    String? weekKey = week["weekKey"];
+    DateTime date = week["date"];
+    String sura = week["sura"];
+    int maxVerse = suras[sura] ?? 1;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 25),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isSaved 
-            ? const Color.fromARGB(255, 255, 255, 255)
-            : const Color(0xFFF1F8F4),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(2, 2)),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: isSaved
-                      ? null
-                      : () async {
-                          DateTime? picked = await showDatePicker(
-                            context: context,
-                            initialDate: week["date"],
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              week["date"] = picked;
-                            });
-                          }
-                        },
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "تاريخ الحصة: ${week["date"].toLocal().toString().split(' ')[0]}",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isSaved ? Colors.grey.shade700 : Colors.black,
+    return Card(
+      margin: EdgeInsets.only(bottom: 20),
+      elevation: 3,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ✅ HEADER AVEC DESIGN VERT + MODIFICATION DATE
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Color(0xFF4F6F52).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Date MODIFIABLE
+                  Expanded(
+                    child: InkWell(
+                      onTap: isSaved
+                          ? null
+                          : () async {
+                              DateTime? picked = await showDatePicker(
+                                context: context,
+                                initialDate: date,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2030),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  week["date"] = picked;
+                                });
+                              }
+                            },
+                      child: Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF4F6F52).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: isSaved ? null : Border.all(
+                            color: Color(0xFF4F6F52),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (!isSaved)
+                              Icon(Icons.calendar_today, 
+                                   size: 16, 
+                                   color: Color(0xFF4F6F52)),
+                            if (!isSaved)
+                              SizedBox(width: 4),
+                            Text(
+                              'تاريخ الحصة: ${date.day}-${date.month}-${date.year}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4F6F52),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
+                  
+                  SizedBox(width: 8),
+                  
+                  // Boutons
+                  Row(
+                    children: [
+                      if (!isSaved)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: Icon(Icons.check, color: Colors.white, size: 24),
+                            onPressed: () => _saveWeeklyRecord(weekIndex, week),
+                            tooltip: "حفظ الصفحة",
+                          ),
+                        ),
+                      if (isSaved)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: Icon(Icons.edit, color: Colors.white, size: 24),
+                            onPressed: () {
+                              setState(() {
+                                week["isSaved"] = false;
+                              });
+                            },
+                            tooltip: "تعديل الصفحة",
+                          ),
+                        ),
+                      SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.close, color: Colors.white, size: 24),
+                          onPressed: () => _deleteWeeklyRecord(weekIndex, week),
+                          tooltip: "حذف الصفحة",
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ✅ DROPDOWN SOURATE MODIFIABLE AVEC DESIGN VERT
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Color(0xFF4F6F52).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: isSaved ? null : Border.all(
+                  color: Color(0xFF4F6F52),
+                  width: 1,
                 ),
               ),
-              const SizedBox(width: 8),
-
-              // ✅ SAVE BUTTON
-              if (!isSaved)
-                InkWell(
-                  onTap: () => _saveWeeklyRecord(weekIndex, week),
-                  child: _roundedIcon(Icons.check, Colors.green),
+              child: DropdownButtonFormField<String>(
+                value: sura,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
                 ),
-
-              // ✅ EDIT BUTTON
-              if (isSaved)
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      week["isSaved"] = false;
-                    });
-                  },
-                  child: _roundedIcon(Icons.edit, Colors.orange),
+                dropdownColor: Colors.white,
+                style: TextStyle(
+                  color: Color(0xFF4F6F52),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-
-              const SizedBox(width: 6),
-
-              // ❌ DELETE BUTTON
-              InkWell(
-                onTap: () => _deleteWeeklyRecord(weekIndex, week),
-                child: _roundedIcon(Icons.close, Colors.red),
+                onChanged: isSaved
+                    ? null
+                    : (val) {
+                        setState(() {
+                          week["sura"] = val!;
+                        });
+                      },
+                items: suras.keys
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s),
+                        ))
+                    .toList(),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          // SURAT DROPDOWN
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.green[100],
-              borderRadius: BorderRadius.circular(8),
             ),
-            child: DropdownButton<String>(
-              value: week["sura"],
-              isExpanded: true,
-              underline: const SizedBox(),
-              onChanged: isSaved
-                  ? null
-                  : (val) {
-                      setState(() {
-                        week["sura"] = val!;
-                        int maxVerse = suras[val]!;
-                        for (int i = 0; i < 7; i++) {
-                          week["verseFrom"][i] = 1;
-                          week["verseTo"][i] = maxVerse;
-                        }
-                      });
-                    },
-              items: suras.keys
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-            ),
-          ),
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-          // HEADER
-          Container(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            color: Colors.green[200],
-            child: Row(
-              children: [
-                Expanded(child: Center(child: Text("اليوم", style: TextStyle(fontWeight: FontWeight.bold)))),
-                Expanded(child: Center(child: Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)))),
-                Expanded(child: Center(child: Text("مراجعة", style: TextStyle(fontWeight: FontWeight.bold)))),
-              ],
-            ),
-          ),
-
-          // DAYS ROWS
-          Column(
-            children: List.generate(7, (i) {
-              int maxVerse = suras[week["sura"]]!;
-
-              return Row(
+            // ✅ TABLE HEADER VERT
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: Color(0xFF4F6F52),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
                 children: [
                   Expanded(
                     child: Center(
                       child: Text(
-                        ["الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت","الأحد"][i],
+                        'اليوم',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ),
-
-                  // VERSES
                   Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        DropdownButton<int>(
-                          value: week["verseFrom"][i],
-                          onChanged: isSaved
-                              ? null
-                              : (val) {
-                                  setState(() {
-                                    week["verseFrom"][i] = val!;
-                                  });
-                                },
-                          items: List.generate(maxVerse, (v) => v + 1)
-                              .map((v) => DropdownMenuItem(value: v, child: Text(v.toString())))
-                              .toList(),
+                    child: Center(
+                      child: Text(
+                        'حفظ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 14,
                         ),
-                        Text(" إلى "),
-                        DropdownButton<int>(
-                          value: week["verseTo"][i],
-                          onChanged: isSaved
-                              ? null
-                              : (val) {
-                                  setState(() {
-                                    week["verseTo"][i] = val!;
-                                  });
-                                },
-                          items: List.generate(maxVerse, (v) => v + 1)
-                              .map((v) => DropdownMenuItem(value: v, child: Text(v.toString())))
-                              .toList(),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-
-                  // REVISION TEXT
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: TextFormField(
-                        initialValue: week["revision"][i],
-                        enabled: !isSaved,
-                        onChanged: (val) => week["revision"][i] = val,
-                        decoration: InputDecoration(
-                          hintText: "مراجعة اليوم",
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    child: Center(
+                      child: Text(
+                        'مراجعة',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 14,
                         ),
                       ),
                     ),
                   ),
                 ],
-              );
-            }),
-          ),
-
-          const SizedBox(height: 10),
-
-          // NOTES
-          TextFormField(
-            initialValue: week["notes"],
-            enabled: !isSaved,
-            onChanged: (val) => week["notes"] = val,
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: "ملاحظات إضافية للأسبوع القادم",
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              fillColor: Colors.green[100],
-              filled: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 8),
+
+            // ✅ TABLE ROWS - SANS OVERFLOW
+            Column(
+              children: List.generate(7, (i) {
+                List<String> days = [
+                  'الإثنين',
+                  'الثلاثاء',
+                  'الأربعاء',
+                  'الخميس',
+                  'الجمعة',
+                  'السبت',
+                  'الأحد'
+                ];
+                
+                return Container(
+                  margin: EdgeInsets.only(bottom: 4),
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    color: i % 2 == 0 
+                        ? Color(0xFF4F6F52).withOpacity(0.05)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      // ✅ DAY NAME - RÉTRÉCI
+                      Expanded(
+                        flex: 1,
+                        child: Center(
+                          child: Text(
+                            days[i],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                      // ✅ VERSE FROM-TO - ÉLARGI
+                      Expanded(
+                        flex: 4,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // From
+                            Flexible(
+                              child: Container(
+                                constraints: BoxConstraints(maxWidth: 60),
+                                child: DropdownButtonFormField<int>(
+                                  value: week["verseFrom"][i],
+                                  decoration: InputDecoration(
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 8,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    isDense: true,
+                                  ),
+                                  isExpanded: true,
+                                  style: TextStyle(fontSize: 11, color: Colors.black),
+                                  onChanged: isSaved
+                                      ? null
+                                      : (val) {
+                                          setState(() {
+                                            week["verseFrom"][i] = val!;
+                                          });
+                                        },
+                                  items: List.generate(maxVerse, (v) => v + 1)
+                                      .map((v) => DropdownMenuItem(
+                                            value: v,
+                                            child: Text(
+                                              v.toString(),
+                                              style: TextStyle(fontSize: 11),
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ),
+                            ),
+                            
+                            // "إلى"
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 3),
+                              child: Text(
+                                'إلى',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                            ),
+                            
+                            // To
+                            Flexible(
+                              child: Container(
+                                constraints: BoxConstraints(maxWidth: 60),
+                                child: DropdownButtonFormField<int>(
+                                  value: week["verseTo"][i],
+                                  decoration: InputDecoration(
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 8,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    isDense: true,
+                                  ),
+                                  isExpanded: true,
+                                  style: TextStyle(fontSize: 11, color: Colors.black),
+                                  onChanged: isSaved
+                                      ? null
+                                      : (val) {
+                                          setState(() {
+                                            week["verseTo"][i] = val!;
+                                          });
+                                        },
+                                  items: List.generate(maxVerse, (v) => v + 1)
+                                      .map((v) => DropdownMenuItem(
+                                            value: v,
+                                            child: Text(
+                                              v.toString(),
+                                              style: TextStyle(fontSize: 11),
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // ✅ REVISION TEXT
+                      Expanded(
+                        flex: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: TextFormField(
+                            initialValue: week["revision"][i],
+                            enabled: !isSaved,
+                            onChanged: (val) => week["revision"][i] = val,
+                            style: TextStyle(fontSize: 11),
+                            decoration: InputDecoration(
+                              hintText: "مراجعة اليوم",
+                              hintStyle: TextStyle(fontSize: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 8,
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ✅ NOTES AVEC DESIGN VERT
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Color(0xFF4F6F52).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextFormField(
+                initialValue: week["notes"],
+                enabled: !isSaved,
+                onChanged: (val) => week["notes"] = val,
+                maxLines: 2,
+                style: TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: "ملاحظات إضافية للأسبوع القادم",
+                  hintStyle: TextStyle(fontSize: 12),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ✅ FONCTION DE SAUVEGARDE AVEC INDEX ADMIN
+  // ✅ Sauvegarder dans students_follow_up
   Future<void> _saveWeeklyRecord(int weekIndex, Map<String, dynamic> week) async {
     try {
       setState(() {
         week["isSaved"] = true;
       });
 
-      DateTime date = week["date"];
-      String month = '${date.year}-${date.month.toString().padLeft(2, '0')}';
-      String weekKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-W${((date.day - 1) ~/ 7) + 1}';
-      
-      String docId = '${widget.groupId}_$month';
-
-      // Préparer les données de l'étudiant pour cette semaine
-      Map<String, dynamic> studentWeekData = {
+      Map<String, dynamic> dataToSave = {
+        'date': Timestamp.fromDate(week["date"]),
         'sura': week["sura"],
         'verseFrom': week["verseFrom"],
         'verseTo': week["verseTo"],
         'revision': week["revision"],
         'notes': week["notes"],
-        'date': Timestamp.fromDate(week["date"]),
+        'profId': _auth.currentUser!.uid,
+        'groupId': widget.groupId,
       };
 
-      // ✅ SAUVEGARDER AVEC CHAMPS INDEX POUR ADMIN
-      await _firestore.collection('attendance').doc(docId).set({
-        // ✅ CHAMPS INDEX POUR FILTRES ADMIN
-        'groupId': widget.groupId,
-        'groupName': groupName,
-        'profId': _auth.currentUser!.uid,
-        'month': month,
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastUpdated': FieldValue.serverTimestamp(),
-        
-        // Données de présence par semaine
-        'weeklyRecords': {
-          weekKey: {
-            'students': {
-              widget.studentId: studentWeekData,
-            }
-          }
-        }
-      }, SetOptions(merge: true));
+      // ✅ Si ficheId existe → UPDATE, sinon → CREATE
+      if (week["ficheId"] != null) {
+        // Modification d'une fiche existante
+        await _firestore
+            .collection('students_follow_up')
+            .doc(widget.studentId)
+            .collection('weekly_records')
+            .doc(week["ficheId"])
+            .update({
+          ...dataToSave,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Création nouvelle fiche
+        DocumentReference docRef = await _firestore
+            .collection('students_follow_up')
+            .doc(widget.studentId)
+            .collection('weekly_records')
+            .add({
+          ...dataToSave,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
-      // Sauvegarder les références pour édition/suppression
-      setState(() {
-        week["docId"] = docId;
-        week["weekKey"] = weekKey;
-      });
+        setState(() {
+          week["ficheId"] = docRef.id;
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("تم حفظ الصفحة بنجاح ✓"),
-          backgroundColor: Colors.green,
+          backgroundColor: Color(0xFF4F6F52),
         ),
       );
     } catch (e) {
@@ -524,83 +657,56 @@ class _FollowStudentPageState extends State<FollowStudentPage> {
     }
   }
 
-  // ✅ FONCTION DE SUPPRESSION
+  // ✅ Supprimer de students_follow_up
   Future<void> _deleteWeeklyRecord(int weekIndex, Map<String, dynamic> week) async {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("تأكيد الحذف"),
-        content: Text("هل تريد حذف هذا الجدول؟"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("إلغاء"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text("تأكيد الحذف"),
+          content: Text("هل تريد حذف هذا الجدول؟"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text("إلغاء"),
             ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              
-              // Si déjà sauvegardé, supprimer de Firestore
-              if (week["isSaved"] == true && week["docId"] != null && week["weekKey"] != null) {
-                try {
-                  String docId = week["docId"];
-                  String weekKey = week["weekKey"];
-                  
-                  // Supprimer l'étudiant de cette semaine
-                  await _firestore.collection('attendance').doc(docId).update({
-                    'weeklyRecords.$weekKey.students.${widget.studentId}': FieldValue.delete(),
-                    'lastUpdated': FieldValue.serverTimestamp(),
-                  });
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("تم حذف الفيشة من قاعدة البيانات"),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                } catch (e) {
-                  print('Erreur suppression Firestore: $e');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("حدث خطأ أثناء الحذف: $e"),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                
+                if (week["isSaved"] == true && week["ficheId"] != null) {
+                  try {
+                    await _firestore
+                        .collection('students_follow_up')
+                        .doc(widget.studentId)
+                        .collection('weekly_records')
+                        .doc(week["ficheId"])
+                        .delete();
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("تم حذف الفيشة من قاعدة البيانات"),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  } catch (e) {
+                    print('Erreur suppression: $e');
+                  }
                 }
-              }
-              
-              // Supprimer de la liste locale
-              setState(() {
-                weeklyRecords.removeAt(weekIndex);
-              });
-            },
-            child: Text("حذف"),
-          ),
-        ],
+                
+                setState(() {
+                  weeklyRecords.removeAt(weekIndex);
+                });
+              },
+              child: Text("حذف"),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _roundedIcon(IconData icon, Color color) {
-    return Container(
-      padding: EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(1, 2)),
-        ],
-      ),
-      child: Icon(icon, color: Colors.white, size: 20),
-    );
-  }
-
-  void _showTestForm() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("تخطيط الاختبار - قريباً")),
     );
   }
 }
