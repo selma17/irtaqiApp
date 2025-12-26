@@ -178,106 +178,159 @@ class _StudentPageState extends State<StudentPage> {
     return Drawer(
       child: Column(
         children: [
+          // 🎨 HEADER AMÉLIORÉ avec dégradé diagonal
           Container(
             width: double.infinity,
-            padding: EdgeInsets.fromLTRB(20, 50, 20, 20),
+            padding: EdgeInsets.fromLTRB(24, 60, 24, 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
+                colors: [
+                  Color(0xFF2D5016),  // Vert foncé
+                  Color(0xFF4F6F52),  // Vert moyen
+                  Color(0xFF739072),  // Vert clair
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 35,
-                  backgroundColor: Colors.white,
-                  backgroundImage: currentUser?.profileImage != null
-                      ? NetworkImage(currentUser!.profileImage!)
-                      : null,
-                  child: currentUser?.profileImage == null
-                      ? Icon(
-                          Icons.person,
-                          size: 35,
-                          color: Color(0xFF4F6F52),
-                        )
-                      : null,
+                // Avatar avec bordure blanche
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    backgroundImage: currentUser?.profileImage != null
+                        ? NetworkImage(currentUser!.profileImage!)
+                        : null,
+                    child: currentUser?.profileImage == null
+                        ? Icon(
+                            Icons.person,
+                            size: 40,
+                            color: Color(0xFF4F6F52),
+                          )
+                        : null,
+                  ),
                 ),
-                SizedBox(height: 12),
+                SizedBox(height: 16),
+                
+                // Nom avec style moderne
                 Text(
                   currentUser?.fullName ?? 'الطالب',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  currentUser?.email ?? '',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
+                SizedBox(height: 6),
+                
+                // Email avec icône
+                Row(
+                  children: [
+                    Icon(
+                      Icons.email_outlined,
+                      color: Colors.white70,
+                      size: 14,
+                    ),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        currentUser?.email ?? '',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          SizedBox(height: 10),
+          
+          SizedBox(height: 8),
+          
+          // 📋 MENU ITEMS AMÉLIORÉS
           Expanded(
             child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
-                _buildDrawerItem(
-                  icon: Icons.home,
+                // Accueil
+                _buildModernDrawerItem(
+                  icon: Icons.home_outlined,
                   title: 'الرئيسية',
+                  color: Color(0xFF4F6F52),
                   onTap: () => Navigator.pop(context),
                 ),
-                _buildDrawerItem(
-                  icon: Icons.badge,
+                
+                SizedBox(height: 4),
+                
+                // Fيش
+                _buildModernDrawerItem(
+                  icon: Icons.badge_outlined,
                   title: 'الفيش الشخصي',
+                  color: Color(0xFF5F8D4E),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => StudentProfileCardPage(),
-                      ),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.assessment,
-                  title: 'فيش المتابعة',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => StudentTrackingSummaryPage(),
-                      ),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.calculate,
-                  title: 'العداد',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CounterPage(),
-                      ),
+                      MaterialPageRoute(builder: (_) => StudentProfileCardPage()),
                     );
                   },
                 ),
                 
-                // ✅ NOUVEAU : Item Annonces avec badge
+                SizedBox(height: 4),
+                
+                // Suivi
+                _buildModernDrawerItem(
+                  icon: Icons.assessment_outlined,
+                  title: 'فيش المتابعة',
+                  color: Color(0xFFf39c12),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => StudentTrackingSummaryPage()),
+                    );
+                  },
+                ),
+                
+                SizedBox(height: 4),
+                
+                // Compteur
+                _buildModernDrawerItem(
+                  icon: Icons.calculate_outlined,
+                  title: 'العداد',
+                  color: Color(0xFF3498db),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => CounterPage()),
+                    );
+                  },
+                ),
+                
+                SizedBox(height: 4),
+                
+                // Annonces avec badge
                 _buildDrawerItemWithBadge(
-                  icon: Icons.campaign,
+                  icon: Icons.campaign_outlined,
                   title: 'الإعلانات',
                   onTap: () {
                     Navigator.pop(context);
@@ -285,53 +338,65 @@ class _StudentPageState extends State<StudentPage> {
                   },
                 ),
                 
-                _buildDrawerItem(
-                  icon: Icons.message,
+                SizedBox(height: 4),
+                
+                // Message
+                _buildModernDrawerItem(
+                  icon: Icons.message_outlined,
                   title: 'إرسال ملاحظة',
+                  color: Color(0xFF16a085),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => SendRemarkPage(),
-                      ),
+                      MaterialPageRoute(builder: (_) => SendRemarkPage()),
                     );
                   },
                 ),
-                _buildDrawerItem(
-                  icon: Icons.quiz,
+                
+                SizedBox(height: 4),
+                
+                // Examens
+                _buildModernDrawerItem(
+                  icon: Icons.assignment_outlined,
                   title: 'الامتحانات',
+                  color: Color(0xFF9b59b6),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => StudentExamsPage(),
-                      ),
+                      MaterialPageRoute(builder: (_) => StudentExamsPage()),
                     );
                   },
                 ),
-                Divider(height: 24, thickness: 1, indent: 16, endIndent: 16),
-                _buildDrawerItem(
-                  icon: Icons.settings,
+                
+                SizedBox(height: 12),
+                Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
+                SizedBox(height: 12),
+                
+                // Paramètres
+                _buildModernDrawerItem(
+                  icon: Icons.settings_outlined,
                   title: 'إعدادات الحساب',
+                  color: Colors.grey[700]!,
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => AccountSettingsPage(),
-                      ),
+                      MaterialPageRoute(builder: (_) => AccountSettingsPage()),
                     );
                   },
                 ),
               ],
             ),
           ),
+          
+          // 🚪 DÉCONNEXION EN BAS
           Divider(height: 1),
-          _buildDrawerItem(
+          _buildModernDrawerItem(
             icon: Icons.logout,
             title: 'تسجيل الخروج',
+            color: Colors.red,
             isLogout: true,
             onTap: () async {
               await _authService.logout();
@@ -341,38 +406,62 @@ class _StudentPageState extends State<StudentPage> {
               );
             },
           ),
-          SizedBox(height: 10),
+          SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  Widget _buildDrawerItem({
+  // 🎨 NOUVEAU STYLE D'ITEM
+  Widget _buildModernDrawerItem({
     required IconData icon,
     required String title,
+    required Color color,
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isLogout ? Colors.red : Color(0xFF4F6F52),
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isLogout ? Colors.red : Colors.black87,
-          fontWeight: FontWeight.w500,
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 22,
+          ),
         ),
-      ),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isLogout ? Colors.red : Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+        trailing: Icon(
+          Icons.arrow_back_ios,
+          color: Colors.grey[400],
+          size: 14,
+        ),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        hoverColor: color.withOpacity(0.05),
       ),
     );
   }
 
-  // ✅ NOUVEAU : DrawerItem avec badge
+  // ✅ GARDE L'ANCIEN _buildDrawerItemWithBadge (ne change rien)
   Widget _buildDrawerItemWithBadge({
     required IconData icon,
     required String title,
@@ -406,35 +495,65 @@ class _StudentPageState extends State<StudentPage> {
                   .length;
             }
 
-            return ListTile(
-              leading: Icon(icon, color: Color(0xFF4F6F52)),
-              title: Text(
-                title,
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w500,
-                ),
+            return Container(
+              margin: EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
               ),
-              trailing: unreadCount > 0
-                  ? Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        unreadCount > 9 ? '9+' : unreadCount.toString(),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+              child: ListTile(
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                leading: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Color(0xFFe74c3c).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Color(0xFFe74c3c),
+                    size: 22,
+                  ),
+                ),
+                title: Text(
+                  title,
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (unreadCount > 0)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : unreadCount.toString(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    )
-                  : null,
-              onTap: onTap,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                    SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_back_ios,
+                      color: Colors.grey[400],
+                      size: 14,
+                    ),
+                  ],
+                ),
+                onTap: onTap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                hoverColor: Color(0xFFe74c3c).withOpacity(0.05),
               ),
             );
           },
@@ -442,7 +561,34 @@ class _StudentPageState extends State<StudentPage> {
       },
     );
   }
-  
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isLogout = false,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isLogout ? Colors.red : Color(0xFF4F6F52),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isLogout ? Colors.red : Colors.black87,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  // ✅ NOUVEAU : DrawerItem avec badge
+
   Widget _buildWelcomeCard() {
     return Container(
       padding: EdgeInsets.all(20),
