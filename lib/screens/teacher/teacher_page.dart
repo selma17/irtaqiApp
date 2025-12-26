@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:irtaqi_new/screens/teacher/exams_page.dart';
-import '../services/exam_service.dart';
-import '../models/exam_model.dart';
-import 'login_page.dart';
-import 'groups_page.dart';
-import 'all_students_page.dart';
-import 'teacher/teacher_settings_page.dart';
-import 'teacher/teacher_schedule_page.dart';
-import 'teacher/teacher_send_remark_page.dart';
-import 'teacher/teacher_announcements_page.dart';
-import 'teacher/teacher_profile_page.dart';
+import '/services/exam_service.dart';
+import '/models/exam_model.dart';
+import '../login_page.dart';
+import '../groups_page.dart';
+import '../teacher/all_students_page.dart';
+import 'teacher_settings_page.dart';
+import 'teacher_schedule_page.dart';
+import 'teacher_send_remark_page.dart';
+import 'teacher_announcements_page.dart';
+import 'teacher_profile_page.dart';
 
 class TeacherPage extends StatefulWidget {
   @override

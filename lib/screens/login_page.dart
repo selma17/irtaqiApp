@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';  // ⭐ AJOUTÉ
 import 'admin/admin_page.dart';
-import 'teacher_page.dart';
-import 'student_page.dart';
+import 'teacher/teacher_page.dart';
+import 'student/student_page.dart';
 
 class LoginPage extends StatefulWidget {
   @override

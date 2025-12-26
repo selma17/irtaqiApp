@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'follow_student_page.dart';
+import '../teacher/follow_student_page.dart';
 
 class AllStudentsPage extends StatefulWidget {
   @override
