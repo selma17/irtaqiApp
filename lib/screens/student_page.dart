@@ -374,7 +374,6 @@ class _StudentPageState extends State<StudentPage> {
                 Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
                 SizedBox(height: 12),
                 
-                // Paramètres
                 _buildModernDrawerItem(
                   icon: Icons.settings_outlined,
                   title: 'إعدادات الحساب',
@@ -412,7 +411,6 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  // 🎨 NOUVEAU STYLE D'ITEM
   Widget _buildModernDrawerItem({
     required IconData icon,
     required String title,

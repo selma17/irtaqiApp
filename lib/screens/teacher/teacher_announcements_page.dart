@@ -1,10 +1,10 @@
-// lib/screens/teacher/teacher_announcements_page.dart
-// ✅ VERSION CORRIGÉE - Ajout ouverture détails d'annonce
+// lib/screens/professor/professor_announcements_page.dart
+// ✅ VERSION COMPLÈTE - Avec filtres (الكل / جديدة / مقروءة)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../common/announcement_detail_page.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import '../../services/auth_service.dart';
 
 class TeacherAnnouncementsPage extends StatefulWidget {
   @override
@@ -12,13 +12,81 @@ class TeacherAnnouncementsPage extends StatefulWidget {
 }
 
 class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
+  final AuthService _authService = AuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  String? currentUserId;
+  String? currentUserGroupId;
+  
+  // ✅ Filtre actif
+  String _currentFilter = 'all'; // 'all', 'new', 'read'
 
-  String selectedFilter = 'all'; // all, new, old
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    currentUserId = _authService.getCurrentUserId();
+    
+    if (currentUserId != null) {
+      DocumentSnapshot userDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .get();
+      
+      if (userDoc.exists) {
+        setState(() {
+          currentUserGroupId = (userDoc.data() as Map<String, dynamic>)['assignedGroupId'];
+        });
+      }
+    }
+  }
+
+  Future<void> _markAsRead(String announcementId) async {
+    if (currentUserId == null) return;
+
+    try {
+      await _firestore.collection('users').doc(currentUserId).update({
+        'readAnnouncements': FieldValue.arrayUnion([announcementId])
+      });
+    } catch (e) {
+      print('Erreur marquage lecture: $e');
+    }
+  }
+
+  bool _isAnnouncementRead(String announcementId, List<String> readAnnouncements) {
+    return readAnnouncements.contains(announcementId);
+  }
+
+  bool _isAnnouncementForTeacher(Map<String, dynamic> data) {
+    String targetAudience = data['targetAudience'] ?? 'all';
+    
+    switch (targetAudience) {
+      case 'all':
+        return true;
+      case 'teachers':
+        return true;
+      case 'students':
+        return false;
+      case 'group':
+        String? announcementGroupId = data['groupId'];
+        return announcementGroupId == currentUserGroupId;
+      default:
+        return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (currentUserId == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text('الإعلانات')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -29,217 +97,147 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
         ),
         body: Column(
           children: [
-            _buildHeader(),
-            SizedBox(height: 16),
             _buildFilterChips(),
             SizedBox(height: 16),
-            Expanded(
-              child: _buildAnnouncementsList(),
-            ),
+            Expanded(child: _buildAnnouncementsList()),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF4F6F52), Color(0xFF6B8F71)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF4F6F52).withOpacity(0.3),
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.campaign, color: Colors.white, size: 32),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'الإعلانات',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'تابع آخر الإعلانات والأخبار',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFilterChips() {
-    return Container(
-      height: 50,
-      padding: EdgeInsets.symmetric(horizontal: 16),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildFilterChip('الكل', 'all'),
-          SizedBox(width: 8),
-          _buildFilterChip('جديدة', 'new'),
-          SizedBox(width: 8),
-          _buildFilterChip('مقروءة', 'old'),
+          _buildFilterChip(label: 'الكل', value: 'all', icon: Icons.list),
+          SizedBox(width: 12),
+          _buildFilterChip(label: 'جديدة', value: 'new', icon: Icons.new_releases),
+          SizedBox(width: 12),
+          _buildFilterChip(label: 'مقروءة', value: 'read', icon: Icons.done_all),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    bool isSelected = selectedFilter == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          selectedFilter = value;
-        });
-      },
-      backgroundColor: Colors.white,
-      selectedColor: Color(0xFF4F6F52).withOpacity(0.2),
-      labelStyle: TextStyle(
-        color: isSelected ? Color(0xFF4F6F52) : Colors.grey[700],
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
-      checkmarkColor: Color(0xFF4F6F52),
-      shape: RoundedRectangleBorder(
+  Widget _buildFilterChip({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    bool isSelected = _currentFilter == value;
+    
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentFilter = value),
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isSelected ? Color(0xFF4F6F52) : Colors.grey[300]!,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Color(0xFF4F6F52) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? Color(0xFF4F6F52) : Colors.grey[300]!,
+              width: 1.5,
+            ),
+            boxShadow: isSelected ? [
+              BoxShadow(
+                color: Color(0xFF4F6F52).withOpacity(0.3),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ] : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: isSelected ? Colors.white : Colors.grey[600], size: 18),
+              SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[700],
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildAnnouncementsList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
-          .collection('announcements')
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(color: Color(0xFF4F6F52)),
-          );
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _firestore.collection('users').doc(currentUserId).snapshots(),
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
         }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 60, color: Colors.red),
-                SizedBox(height: 16),
-                Text(
-                  'حدث خطأ في تحميل الإعلانات',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ],
-            ),
-          );
+        List<String> readAnnouncements = [];
+        if (userSnapshot.data!.exists) {
+          Map<String, dynamic> userData = userSnapshot.data!.data() as Map<String, dynamic>;
+          readAnnouncements = List<String>.from(userData['readAnnouncements'] ?? []);
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.campaign_outlined, size: 80, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'لا توجد إعلانات حاليًا',
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
-                ),
-              ],
-            ),
-          );
-        }
-
-        List<DocumentSnapshot> announcements = snapshot.data!.docs;
-        
-        return FutureBuilder<DocumentSnapshot>(
-          future: _firestore
-              .collection('users')
-              .doc(_auth.currentUser?.uid)
-              .get(),
-          builder: (context, userSnapshot) {
-            List<String> readAnnouncements = [];
-            
-            if (userSnapshot.hasData && userSnapshot.data!.exists) {
-              Map<String, dynamic> userData = userSnapshot.data!.data() as Map<String, dynamic>;
-              readAnnouncements = List<String>.from(userData['readAnnouncements'] ?? []);
+        return StreamBuilder<QuerySnapshot>(
+          stream: _firestore
+              .collection('announcements')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
             }
 
-            // Filtrer
-            List<DocumentSnapshot> filteredAnnouncements = announcements.where((doc) {
-              bool isRead = readAnnouncements.contains(doc.id);
-              
-              if (selectedFilter == 'new') return !isRead;
-              if (selectedFilter == 'old') return isRead;
-              return true; // 'all'
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return _buildEmptyState();
+            }
+
+            List<DocumentSnapshot> filteredByAudience = snapshot.data!.docs.where((doc) {
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              return _isAnnouncementForTeacher(data);
             }).toList();
 
-            if (filteredAnnouncements.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.filter_alt_off, size: 60, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'لا توجد إعلانات في هذا التصنيف',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
+            List<DocumentSnapshot> filteredDocs = filteredByAudience.where((doc) {
+              bool isRead = _isAnnouncementRead(doc.id, readAnnouncements);
+              
+              switch (_currentFilter) {
+                case 'all': return true;
+                case 'new': return !isRead;
+                case 'read': return isRead;
+                default: return true;
+              }
+            }).toList();
+
+            if (filteredDocs.isEmpty) {
+              return _buildEmptyState();
             }
 
-            return ListView.separated(
-              padding: EdgeInsets.all(16),
-              itemCount: filteredAnnouncements.length,
-              separatorBuilder: (context, index) => SizedBox(height: 12),
+            return ListView.builder(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              itemCount: filteredDocs.length,
               itemBuilder: (context, index) {
-                var doc = filteredAnnouncements[index];
+                DocumentSnapshot doc = filteredDocs[index];
                 Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-                bool isRead = readAnnouncements.contains(doc.id);
                 
+                String title = data['title'] ?? 'بدون عنوان';
+                String content = data['content'] ?? '';
+                String targetAudience = data['targetAudience'] ?? 'all';
+                Timestamp? timestamp = data['createdAt'];
+                bool isRead = _isAnnouncementRead(doc.id, readAnnouncements);
+
                 return _buildAnnouncementCard(
-                  doc.id,
-                  data,
-                  isRead,
+                  announcementId: doc.id,
+                  title: title,
+                  content: content,
+                  targetAudience: targetAudience,
+                  timestamp: timestamp,
+                  isRead: isRead,
                 );
               },
             );
@@ -249,96 +247,114 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
     );
   }
 
-  Widget _buildAnnouncementCard(String announcementId, Map<String, dynamic> data, bool isRead) {
-    String title = data['title'] ?? 'إعلان';
-    String message = data['message'] ?? data['content'] ?? '';
-    Timestamp? timestamp = data['createdAt'];
-    DateTime createdAt = timestamp?.toDate() ?? DateTime.now();
+  Widget _buildEmptyState() {
+    String message = 'لا توجد إعلانات';
+    if (_currentFilter == 'new') message = 'لا توجد إعلانات جديدة';
+    else if (_currentFilter == 'read') message = 'لا توجد إعلانات مقروءة';
+    
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.campaign_outlined, size: 80, color: Colors.grey[400]),
+          SizedBox(height: 16),
+          Text(message, style: TextStyle(fontSize: 18, color: Colors.grey[600])),
+        ],
+      ),
+    );
+  }
 
-    return InkWell(
-      // ✅ AJOUTÉ : Ouverture de la page de détails
-      onTap: () {
-        _markAsRead(announcementId);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AnnouncementDetailPage(
-              announcementId: announcementId,
-              announcementData: data,
-            ),
-          ),
-        );
+  Widget _buildAnnouncementCard({
+    required String announcementId,
+    required String title,
+    required String content,
+    required String targetAudience,
+    Timestamp? timestamp,
+    required bool isRead,
+  }) {
+    String formattedDate = 'غير محدد';
+    if (timestamp != null) {
+      DateTime dateTime = timestamp.toDate();
+      formattedDate = DateFormat('HH:mm - dd/MM/yyyy', 'ar').format(dateTime);
+    }
+
+    // Badge couleur selon destinataire
+    Color badgeColor = Color(0xFF4F6F52);
+    switch (targetAudience) {
+      case 'teachers': badgeColor = Color(0xFF3498db); break;
+      case 'students': badgeColor = Color(0xFFf39c12); break;
+      case 'group': badgeColor = Color(0xFF9b59b6); break;
+    }
+
+    return GestureDetector(
+      onTap: () async {
+        await _markAsRead(announcementId);
+        _showAnnouncementDialog(title, content, formattedDate);
       },
       child: Container(
+        margin: EdgeInsets.only(bottom: 12),
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isRead ? Colors.white : Color(0xFF4F6F52).withOpacity(0.05),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isRead ? Colors.grey[300]! : Color(0xFF4F6F52).withOpacity(0.3),
-            width: isRead ? 1 : 2,
-          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 5,
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
               offset: Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                if (!isRead)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    margin: EdgeInsets.only(left: 8),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF4F6F52),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                Expanded(
-                  child: Text(
+            if (!isRead)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            if (!isRead) SizedBox(width: 12),
+            
+            Icon(Icons.arrow_back_ios, color: Colors.grey[400], size: 16),
+            SizedBox(width: 12),
+            
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
                     title,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: isRead ? FontWeight.w600 : FontWeight.bold,
-                      color: isRead ? Colors.grey[800] : Color(0xFF4F6F52),
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Text(
-              message.length > 100 ? message.substring(0, 100) + '...' : message,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: Colors.grey[700],
+                  SizedBox(height: 6),
+                  Text(
+                    content,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                      SizedBox(width: 4),
+                      Text(
+                        formattedDate,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
-                SizedBox(width: 4),
-                Text(
-                  '${createdAt.day}/${createdAt.month}/${createdAt.year} - ${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                ),
-              ],
             ),
           ],
         ),
@@ -346,16 +362,38 @@ class _TeacherAnnouncementsPageState extends State<TeacherAnnouncementsPage> {
     );
   }
 
-  Future<void> _markAsRead(String announcementId) async {
-    try {
-      String? userId = _auth.currentUser?.uid;
-      if (userId == null) return;
-
-      await _firestore.collection('users').doc(userId).update({
-        'readAnnouncements': FieldValue.arrayUnion([announcementId]),
-      });
-    } catch (e) {
-      print('Erreur marquage lecture: $e');
-    }
+  void _showAnnouncementDialog(String title, String content, String date) {
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(title, style: TextStyle(color: Color(0xFF4F6F52), fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(content, style: TextStyle(fontSize: 16)),
+              SizedBox(height: 12),
+              Divider(),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                  SizedBox(width: 6),
+                  Text(date, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('إغلاق', style: TextStyle(color: Color(0xFF4F6F52))),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
