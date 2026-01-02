@@ -12,7 +12,7 @@ import 'student_exams_page.dart';
 import 'student_announcements_page.dart';
 import '../../services/exam_service.dart';
 import '../../models/exam_model.dart';
-import '../../widgets/exam_notification_banner.dart';  // ✅ NOUVELLE PAGE
+import '../../widgets/exam_notification_banner.dart';
 
 class StudentPage extends StatefulWidget {
   @override
@@ -62,7 +62,6 @@ class _StudentPageState extends State<StudentPage> {
           backgroundColor: Color(0xFF4F6F52),
           elevation: 0,
           actions: [
-            // ✅ BADGE NOTIFICATION ANNONCES
             _buildNotificationBadge(),
           ],
         ),
@@ -74,7 +73,7 @@ class _StudentPageState extends State<StudentPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ✅ NOUVEAU : Bannière d'examens à venir
+                    //examens à venir
                     _buildWelcomeCard(),
                     SizedBox(height: 20),
                     _buildProgressCard(),
@@ -90,7 +89,6 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  // ✅ NOUVEAU : Badge notification avec compteur
   Widget _buildNotificationBadge() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('announcements').snapshots(),
@@ -178,16 +176,16 @@ class _StudentPageState extends State<StudentPage> {
     return Drawer(
       child: Column(
         children: [
-          // 🎨 HEADER AMÉLIORÉ avec dégradé diagonal
+          
           Container(
             width: double.infinity,
             padding: EdgeInsets.fromLTRB(24, 60, 24, 24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFF2D5016),  // Vert foncé
-                  Color(0xFF4F6F52),  // Vert moyen
-                  Color(0xFF739072),  // Vert clair
+                  Color(0xFF2D5016), 
+                  Color(0xFF4F6F52), 
+                  Color(0xFF739072),  
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -270,7 +268,7 @@ class _StudentPageState extends State<StudentPage> {
             child: ListView(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
-                // Accueil
+                
                 _buildModernDrawerItem(
                   icon: Icons.home_outlined,
                   title: 'الرئيسية',
@@ -279,8 +277,7 @@ class _StudentPageState extends State<StudentPage> {
                 ),
                 
                 SizedBox(height: 4),
-                
-                // Fيش
+               
                 _buildModernDrawerItem(
                   icon: Icons.badge_outlined,
                   title: 'الفيش الشخصي',
@@ -296,7 +293,6 @@ class _StudentPageState extends State<StudentPage> {
                 
                 SizedBox(height: 4),
                 
-                // Suivi
                 _buildModernDrawerItem(
                   icon: Icons.assessment_outlined,
                   title: 'فيش المتابعة',
@@ -312,7 +308,6 @@ class _StudentPageState extends State<StudentPage> {
                 
                 SizedBox(height: 4),
                 
-                // Compteur
                 _buildModernDrawerItem(
                   icon: Icons.calculate_outlined,
                   title: 'العداد',
@@ -328,7 +323,6 @@ class _StudentPageState extends State<StudentPage> {
                 
                 SizedBox(height: 4),
                 
-                // Annonces avec badge
                 _buildDrawerItemWithBadge(
                   icon: Icons.campaign_outlined,
                   title: 'الإعلانات',
@@ -340,7 +334,6 @@ class _StudentPageState extends State<StudentPage> {
                 
                 SizedBox(height: 4),
                 
-                // Message
                 _buildModernDrawerItem(
                   icon: Icons.message_outlined,
                   title: 'إرسال ملاحظة',
@@ -356,7 +349,6 @@ class _StudentPageState extends State<StudentPage> {
                 
                 SizedBox(height: 4),
                 
-                // Examens
                 _buildModernDrawerItem(
                   icon: Icons.assignment_outlined,
                   title: 'الامتحانات',
@@ -390,7 +382,6 @@ class _StudentPageState extends State<StudentPage> {
             ),
           ),
           
-          // 🚪 DÉCONNEXION EN BAS
           Divider(height: 1),
           _buildModernDrawerItem(
             icon: Icons.logout,
@@ -459,7 +450,6 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  // ✅ GARDE L'ANCIEN _buildDrawerItemWithBadge (ne change rien)
   Widget _buildDrawerItemWithBadge({
     required IconData icon,
     required String title,
@@ -585,8 +575,6 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  // ✅ NOUVEAU : DrawerItem avec badge
-
   Widget _buildWelcomeCard() {
     return Container(
       padding: EdgeInsets.all(20),
@@ -648,13 +636,13 @@ class _StudentPageState extends State<StudentPage> {
       stream: _examService.getStudentUpcomingExamsStream(currentUser!.id),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return SizedBox.shrink(); // Ne rien afficher pendant le chargement
+          return SizedBox.shrink(); 
         }
 
         List<ExamModel> upcomingExams = snapshot.data!;
         
         if (upcomingExams.isEmpty) {
-          return SizedBox.shrink(); // Pas d'examens à venir
+          return SizedBox.shrink(); 
         }
 
         return ExamNotificationBanner(
@@ -819,7 +807,6 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
-  // ✅ MODIFIÉ : Aperçu des annonces avec lien "Voir الكل"
   Widget _buildAnnouncementsPreview() {
     return Container(
       padding: EdgeInsets.all(20),
